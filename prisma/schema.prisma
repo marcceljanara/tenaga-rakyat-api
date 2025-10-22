@@ -19,7 +19,8 @@ model User {
   phone_number String @unique @db.VarChar(20)
   email String @unique @db.VarChar(255)
   password String @db.VarChar(255)
-  role_id String 
+  role_id BigInt
+  refreshTokens RefreshToken[]
   profile_picture_url String? @db.VarChar(255)
   verification_status VerificationStatus @default(UNVERIFIED)
   ktp_number_encrypted String? @db.VarChar(255)
@@ -41,10 +42,21 @@ enum VerificationStatus {
 }
 
 model Role {
-  id String @id @default(uuid())
+  id BigInt @id @default(autoincrement())
   name String @unique @db.VarChar(50)
 
   users User[]
 
   @@map("roles")
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  token       String   @unique @db.VarChar(255)
+  user_id     String
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  expires_at  DateTime
+  created_at  DateTime @default(now())
+
+  @@map("refresh_tokens")
 }
