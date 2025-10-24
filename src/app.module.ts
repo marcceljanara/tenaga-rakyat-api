@@ -3,7 +3,7 @@ import { UserModule } from './modules/user/user.module';
 import { CommonModule } from './common/common.module';
 
 @Module({
-  imports: [UserModule, CommonModule],
+  imports: [CommonModule, UserModule],
   controllers: [],
   providers: [],
 })

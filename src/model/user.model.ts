@@ -16,6 +16,10 @@ export class LoginUserResponse {
   refresh_token: string;
 }
 
+export class RefreshToken {
+  refresh_token: string;
+}
+
 export class UserResponse {
   id: string;
   full_name: string;

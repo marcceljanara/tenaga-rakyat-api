@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { WinstonModule } from 'nest-winston';
 import winston from 'winston';
@@ -6,6 +6,8 @@ import { ConfigModule } from '@nestjs/config';
 import { ValidationService } from './validation.service';
 import { APP_FILTER } from '@nestjs/core';
 import { ErrorFilter } from './error.filter';
+import { AuthMiddleware } from './auth/auth.middleware';
+import { JwtService } from '@nestjs/jwt';
 
 @Global()
 @Module({
@@ -20,6 +22,7 @@ import { ErrorFilter } from './error.filter';
     }),
   ],
   providers: [
+    JwtService,
     PrismaService,
     ValidationService,
     {
@@ -30,4 +33,10 @@ import { ErrorFilter } from './error.filter';
   exports: [PrismaService, ValidationService],
 })
 // implementasi authentikasi JWT
-export class CommonModule {}
+export class CommonModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(AuthMiddleware)
+      .forRoutes('/api/users/refresh', '/api/users/logout');
+  }
+}

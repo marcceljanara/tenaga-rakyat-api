@@ -1,19 +1,19 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
-import { ValidationService } from 'src/common/validation.service';
-import { PrismaService } from 'src/common/prisma.service';
+import { ValidationService } from '../../common/validation.service';
+import { PrismaService } from '../../common/prisma.service';
 import bcrypt from 'bcrypt';
 import {
   LoginUserRequest,
   LoginUserResponse,
   RegisterUserRequest,
   UserResponse,
-} from 'src/model/user.model';
-import { v4 as uuid } from 'uuid';
+} from '../../model/user.model';
 import { UserValidation } from './user.validation';
 import { JwtService } from '@nestjs/jwt';
 import { addDays } from 'date-fns';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class UserService {
@@ -26,7 +26,7 @@ export class UserService {
 
   async register(request: RegisterUserRequest): Promise<UserResponse> {
     this.logger.debug(`Register new user ${JSON.stringify(request)}`);
-    const id: string = uuid();
+    const id: string = randomUUID();
     const registerRequest: RegisterUserRequest =
       this.validationService.validate(UserValidation.REGISTER, request);
 
@@ -92,7 +92,7 @@ export class UserService {
       role_id: String(user.role_id),
     });
 
-    const refreshToken = uuid();
+    const refreshToken = randomUUID();
     await this.prismaService.refreshToken.create({
       data: {
         token: refreshToken,
@@ -102,5 +102,55 @@ export class UserService {
     });
 
     return { access_token: accessToken, refresh_token: refreshToken };
+  }
+
+  async refresh(refreshToken: string): Promise<LoginUserResponse> {
+    this.logger.debug(`Refresh token user ${JSON.stringify(refreshToken)}`);
+    const stored = await this.prismaService.refreshToken.findUnique({
+      where: {
+        token: refreshToken,
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    if (!stored || stored.expires_at < new Date()) {
+      throw new HttpException('Refresh token tidak valid atau kadaluara', 401);
+    }
+
+    await this.prismaService.refreshToken.delete({
+      where: {
+        token: refreshToken,
+      },
+    });
+
+    const newToken = randomUUID();
+    await this.prismaService.refreshToken.create({
+      data: {
+        token: newToken,
+        user_id: stored.user.id,
+        expires_at: addDays(new Date(), 7),
+      },
+    });
+
+    const newAccessToken = await this.jwt.signAsync({
+      sub: stored.user.id,
+      role_id: String(stored.user.role_id),
+    });
+
+    return {
+      access_token: newAccessToken,
+      refresh_token: newToken,
+    };
+  }
+
+  async logout(refreshToken: string): Promise<void> {
+    this.logger.debug(`Refresh token user ${JSON.stringify(refreshToken)}`);
+    await this.prismaService.refreshToken.deleteMany({
+      where: {
+        token: refreshToken,
+      },
+    });
   }
 }
