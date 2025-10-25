@@ -49,7 +49,7 @@ export class UserController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = req.cookies['refresh_token'] as string;
+    const refreshToken = req.cookies?.['refresh_token'] as string;
     const { refresh_token: newRefreshToken, access_token: accessToken } =
       await this.userService.refresh(refreshToken);
     res
@@ -67,7 +67,7 @@ export class UserController {
   @Post('/logout')
   @HttpCode(200)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const refreshToken = req.cookies['refresh_token'] as string;
+    const refreshToken = req.cookies?.['refresh_token'] as string;
     await this.userService.logout(refreshToken);
     res
       .clearCookie('access_token')

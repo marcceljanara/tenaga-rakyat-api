@@ -35,8 +35,6 @@ import { JwtService } from '@nestjs/jwt';
 // implementasi authentikasi JWT
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(AuthMiddleware)
-      .forRoutes('/api/users/refresh', '/api/users/logout');
+    consumer.apply(AuthMiddleware).forRoutes('/api/users/dummy');
   }
 }

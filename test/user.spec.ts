@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import cookieParser from 'cookie-parser';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { TestModule } from './test.module';
@@ -19,6 +20,7 @@ describe('UserController', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     await app.init();
 
     logger = app.get(WINSTON_MODULE_PROVIDER);
@@ -128,6 +130,82 @@ describe('UserController', () => {
       expect(response.headers['set-cookie']).toBeDefined();
       expect(response.headers['set-cookie'][0]).toContain('HttpOnly');
       expect(response.headers['set-cookie'][0]).toContain('access_token');
+    });
+  });
+
+  describe('POST /api/users/refresh', () => {
+    beforeEach(async () => {
+      await testService.deleteAll();
+    });
+    it('should reject if user not login', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/users/refresh')
+        .set('Cookie', '');
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(401);
+      expect(response.body.errors).toBeDefined();
+    });
+    it('should be able to refresh new token', async () => {
+      // Arrange
+      await testService.addUser();
+      const login = await request(app.getHttpServer())
+        .post('/api/users/login')
+        .send({
+          email: 'test@email.com',
+          password: '1234test',
+        });
+      const userCookie = login.headers['set-cookie'];
+
+      // Action
+      const response = await request(app.getHttpServer())
+        .post('/api/users/refresh')
+        .set('Cookie', userCookie);
+
+      // Assert
+      logger.debug(response.headers['set-cookie']);
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['set-cookie']).toBeDefined();
+      expect(response.headers['set-cookie'][0]).toContain('HttpOnly');
+      expect(response.headers['set-cookie'][0]).toContain('access_token');
+      expect(response.headers['set-cookie'][1]).toContain('refresh_token');
+    });
+  });
+
+  describe('POST /api/users/logout', () => {
+    beforeEach(async () => {
+      await testService.deleteAll();
+    });
+    it('should reject if user not login', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/users/logout')
+        .set('Cookie', '');
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(401);
+      expect(response.body.errors).toBeDefined();
+    });
+    it('should be able to logout', async () => {
+      // Arrange
+      await testService.addUser();
+      const login = await request(app.getHttpServer())
+        .post('/api/users/login')
+        .send({
+          email: 'test@email.com',
+          password: '1234test',
+        });
+      const userCookie = login.headers['set-cookie'];
+
+      // Action
+      const response = await request(app.getHttpServer())
+        .post('/api/users/logout')
+        .set('Cookie', userCookie);
+
+      // Assert
+      logger.debug(response.headers['set-cookie'][0]);
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['set-cookie'][0]).toContain(
+        'Expires=Thu, 01 Jan 1970',
+      );
+      expect(response.headers['set-cookie'][0]).toContain('access_token=;');
     });
   });
 });

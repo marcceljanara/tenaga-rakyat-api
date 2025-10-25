@@ -106,6 +106,9 @@ export class UserService {
 
   async refresh(refreshToken: string): Promise<LoginUserResponse> {
     this.logger.debug(`Refresh token user ${JSON.stringify(refreshToken)}`);
+    if (!refreshToken) {
+      throw new HttpException('Missing refresh token', 401);
+    }
     const stored = await this.prismaService.refreshToken.findUnique({
       where: {
         token: refreshToken,
@@ -147,6 +150,9 @@ export class UserService {
 
   async logout(refreshToken: string): Promise<void> {
     this.logger.debug(`Refresh token user ${JSON.stringify(refreshToken)}`);
+    if (!refreshToken) {
+      throw new HttpException('Missing refresh token', 401);
+    }
     await this.prismaService.refreshToken.deleteMany({
       where: {
         token: refreshToken,
