@@ -76,6 +76,9 @@ describe('UserController', () => {
   });
 
   describe('POST /api/users/login', () => {
+    beforeEach(async () => {
+      await testService.deleteAll();
+    });
     it('should reject request if payload invalid', async () => {
       // Arrange
       const payload = {
@@ -206,6 +209,35 @@ describe('UserController', () => {
         'Expires=Thu, 01 Jan 1970',
       );
       expect(response.headers['set-cookie'][0]).toContain('access_token=;');
+    });
+  });
+
+  describe('GET /api/users/profile', () => {
+    beforeEach(async () => {
+      await testService.deleteAll();
+    });
+
+    it('should be able to get profile', async () => {
+      // Arrange
+      await testService.addUser();
+      const login = await request(app.getHttpServer())
+        .post('/api/users/login')
+        .send({
+          email: 'test@email.com',
+          password: '1234test',
+        });
+      const userCookie = login.headers['set-cookie'];
+
+      // Action
+      const response = await request(app.getHttpServer())
+        .get('/api/users/profile')
+        .set('Cookie', userCookie);
+
+      // Assert
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.data).toBeDefined();
+      expect(response.body.data.email).toBe('test@email.com');
     });
   });
 });

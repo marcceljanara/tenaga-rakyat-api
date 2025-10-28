@@ -23,13 +23,13 @@ export class RefreshToken {
 export class UserResponse {
   id: string;
   full_name: string;
-  phone_number?: string;
-  email?: string;
-  role?: number;
-  profile_picture_url?: string;
-  verification_status?: string;
-  ktp_number_encrypted?: string;
-  average_rating?: number;
-  created_at?: string;
-  update_at?: string;
+  phone_number?: string | null;
+  email?: string | null;
+  role?: string | null;
+  profile_picture_url?: string | null;
+  verification_status?: string | null;
+  ktp_number_encrypted?: string | null;
+  average_rating?: number | null;
+  created_at?: Date | null;
+  update_at?: Date | null;
 }

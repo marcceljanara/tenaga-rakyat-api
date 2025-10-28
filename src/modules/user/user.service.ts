@@ -14,6 +14,7 @@ import { UserValidation } from './user.validation';
 import { JwtService } from '@nestjs/jwt';
 import { addDays } from 'date-fns';
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class UserService {
@@ -88,7 +89,7 @@ export class UserService {
     }
 
     const accessToken = await this.jwt.signAsync({
-      sub: user.id,
+      id: user.id,
       role_id: String(user.role_id),
     });
 
@@ -138,7 +139,7 @@ export class UserService {
     });
 
     const newAccessToken = await this.jwt.signAsync({
-      sub: stored.user.id,
+      id: stored.user.id,
       role_id: String(stored.user.role_id),
     });
 
@@ -158,5 +159,38 @@ export class UserService {
         token: refreshToken,
       },
     });
+  }
+
+  async profile(userId: string): Promise<UserResponse> {
+    this.logger.debug(`User ID: ${JSON.stringify(userId)}`);
+    const user = await this.prismaService.user.findUnique({
+      where: {
+        id: userId,
+      },
+      include: { role: true },
+    });
+
+    if (!user) {
+      throw new HttpException('User not found', 404);
+    }
+
+    return this.toUserResponse(user);
+  }
+
+  toUserResponse(
+    response: Prisma.UserGetPayload<{ include: { role: true } }>,
+  ): UserResponse {
+    return {
+      id: response.id,
+      full_name: response.full_name,
+      email: response.email,
+      phone_number: response.phone_number,
+      role: response.role?.name,
+      average_rating: response.average_rating?.toNumber(),
+      profile_picture_url: response.profile_picture_url,
+      verification_status: response.verification_status,
+      update_at: response.updated_at,
+      created_at: response.created_at,
+    };
   }
 }

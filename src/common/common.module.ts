@@ -4,10 +4,11 @@ import { WinstonModule } from 'nest-winston';
 import winston from 'winston';
 import { ConfigModule } from '@nestjs/config';
 import { ValidationService } from './validation.service';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ErrorFilter } from './error.filter';
 import { AuthMiddleware } from './auth/auth.middleware';
-import { JwtService } from '@nestjs/jwt';
+import { JwtModule, JwtService } from '@nestjs/jwt';
+import { RoleGuard } from './role/role.guard';
 
 @Global()
 @Module({
@@ -20,6 +21,10 @@ import { JwtService } from '@nestjs/jwt';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    JwtModule.register({
+      secret: process.env.JWT_SECRET,
+      signOptions: { expiresIn: '15m' },
+    }),
   ],
   providers: [
     JwtService,
@@ -29,12 +34,16 @@ import { JwtService } from '@nestjs/jwt';
       provide: APP_FILTER,
       useClass: ErrorFilter,
     },
+    {
+      provide: APP_GUARD,
+      useClass: RoleGuard,
+    },
   ],
   exports: [PrismaService, ValidationService],
 })
 // implementasi authentikasi JWT
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(AuthMiddleware).forRoutes('/api/users/dummy');
+    consumer.apply(AuthMiddleware).forRoutes('/api/users/profile');
   }
 }

@@ -1,4 +1,12 @@
-import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { UserService } from './user.service';
 import {
   LoginUserRequest,
@@ -7,6 +15,9 @@ import {
 } from '../../model/user.model';
 import { WebResponse } from '../../model/web.model';
 import type { Request, Response } from 'express';
+import { Auth } from '../../common/auth/auth.decorator';
+import { Roles } from '../../common/role/role.decorator';
+import type { User } from '@prisma/client';
 
 @Controller('/api/users')
 export class UserController {
@@ -73,5 +84,15 @@ export class UserController {
       .clearCookie('access_token')
       .clearCookie('refresh_token')
       .json({ message: 'Logged out' });
+  }
+
+  @Get('/profile')
+  @HttpCode(200)
+  @Roles([1, 2, 3, 4])
+  async profile(@Auth() user: User): Promise<WebResponse<UserResponse>> {
+    const response = await this.userService.profile(user.id);
+    return {
+      data: response,
+    };
   }
 }
