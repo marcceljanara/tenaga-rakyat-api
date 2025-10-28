@@ -6,6 +6,13 @@ export class RegisterUserRequest {
   role_id: number;
 }
 
+export class EditUserRequest {
+  full_name?: string;
+  phone_number?: string;
+  about?: string;
+  cv_url?: string;
+}
+
 export class LoginUserRequest {
   email: string;
   password: string;
@@ -30,6 +37,8 @@ export class UserResponse {
   verification_status?: string | null;
   ktp_number_encrypted?: string | null;
   average_rating?: number | null;
+  about?: string | null;
+  cv_url?: string | null;
   created_at?: Date | null;
   update_at?: Date | null;
 }

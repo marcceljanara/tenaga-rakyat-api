@@ -5,6 +5,7 @@ import { ValidationService } from '../../common/validation.service';
 import { PrismaService } from '../../common/prisma.service';
 import bcrypt from 'bcrypt';
 import {
+  EditUserRequest,
   LoginUserRequest,
   LoginUserResponse,
   RegisterUserRequest,
@@ -177,6 +178,30 @@ export class UserService {
     return this.toUserResponse(user);
   }
 
+  async editProfile(
+    userId: string,
+    request: EditUserRequest,
+  ): Promise<UserResponse> {
+    this.logger.debug(`User ID: ${userId}`);
+    const userRequest: EditUserRequest = this.validationService.validate(
+      UserValidation.EDIT_PROFILE,
+      request,
+    );
+    const user = await this.prismaService.user.update({
+      where: {
+        id: userId,
+      },
+      data: userRequest,
+      include: { role: true },
+    });
+
+    if (!user) {
+      throw new HttpException('User not found', 404);
+    }
+
+    return this.toUserResponse(user);
+  }
+
   toUserResponse(
     response: Prisma.UserGetPayload<{ include: { role: true } }>,
   ): UserResponse {
@@ -189,6 +214,8 @@ export class UserService {
       average_rating: response.average_rating?.toNumber(),
       profile_picture_url: response.profile_picture_url,
       verification_status: response.verification_status,
+      about: response.about,
+      cv_url: response.cv_url,
       update_at: response.updated_at,
       created_at: response.created_at,
     };

@@ -240,4 +240,41 @@ describe('UserController', () => {
       expect(response.body.data.email).toBe('test@email.com');
     });
   });
+  describe('PUT /api/users/profile', () => {
+    beforeEach(async () => {
+      await testService.deleteAll();
+    });
+
+    it('should be able to edit user profile', async () => {
+      // Arrange
+      await testService.addUser();
+      const login = await request(app.getHttpServer())
+        .post('/api/users/login')
+        .send({
+          email: 'test@email.com',
+          password: '1234test',
+        });
+      const userCookie = login.headers['set-cookie'];
+
+      const payload = {
+        full_name: 'Otong Test',
+        cv_url: 'https://inilink.com',
+        about: 'ini about',
+      };
+
+      // Action
+      const response = await request(app.getHttpServer())
+        .put('/api/users/profile')
+        .set('Cookie', userCookie)
+        .send(payload);
+
+      // Assert
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.message).toBeDefined();
+      expect(response.body.data.full_name).toBe(payload.full_name);
+      expect(response.body.data.about).toBe(payload.about);
+      expect(response.body.data.cv_url).toBe(payload.cv_url);
+    });
+  });
 });

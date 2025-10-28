@@ -4,11 +4,13 @@ import {
   Get,
   HttpCode,
   Post,
+  Put,
   Req,
   Res,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import {
+  EditUserRequest,
   LoginUserRequest,
   RegisterUserRequest,
   UserResponse,
@@ -92,6 +94,20 @@ export class UserController {
   async profile(@Auth() user: User): Promise<WebResponse<UserResponse>> {
     const response = await this.userService.profile(user.id);
     return {
+      data: response,
+    };
+  }
+
+  @Put('/profile')
+  @HttpCode(200)
+  @Roles([1, 2, 3, 4])
+  async editProfile(
+    @Auth() user: User,
+    @Body() request: EditUserRequest,
+  ): Promise<WebResponse<UserResponse>> {
+    const response = await this.userService.editProfile(user.id, request);
+    return {
+      message: 'Profile berhasil diperbarui',
       data: response,
     };
   }
