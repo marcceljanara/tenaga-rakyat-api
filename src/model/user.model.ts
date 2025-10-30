@@ -27,6 +27,14 @@ export class RefreshToken {
   refresh_token: string;
 }
 
+export class UserPhotoInProfile {
+  id: string;
+  photo_url: string;
+  description: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
 export class UserResponse {
   id: string;
   full_name: string;
@@ -39,6 +47,7 @@ export class UserResponse {
   average_rating?: number | null;
   about?: string | null;
   cv_url?: string | null;
+  photos?: UserPhotoInProfile[];
   created_at?: Date | null;
   update_at?: Date | null;
 }

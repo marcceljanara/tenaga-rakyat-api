@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
 import { JwtModule } from '@nestjs/jwt';
+import { ProfilePictureService } from './profile-picture.service';
 
 @Module({
   imports: [
@@ -11,6 +12,6 @@ import { JwtModule } from '@nestjs/jwt';
     }),
   ],
   controllers: [UserController],
-  providers: [UserService],
+  providers: [UserService, ProfilePictureService],
 })
 export class UserModule {}

@@ -44,6 +44,13 @@ import { RoleGuard } from './role/role.guard';
 // implementasi authentikasi JWT
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(AuthMiddleware).forRoutes('/api/users/profile');
+    consumer
+      .apply(AuthMiddleware)
+      .forRoutes(
+        '/api/users/profile',
+        '/api/users/profile/*',
+        '/api/users/photos',
+        '/api/users/photos/*',
+      );
   }
 }

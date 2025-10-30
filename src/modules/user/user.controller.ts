@@ -1,12 +1,15 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Post,
   Put,
   Req,
   Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import {
@@ -20,10 +23,15 @@ import type { Request, Response } from 'express';
 import { Auth } from '../../common/auth/auth.decorator';
 import { Roles } from '../../common/role/role.decorator';
 import type { User } from '@prisma/client';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ProfilePictureService } from './profile-picture.service';
 
 @Controller('/api/users')
 export class UserController {
-  constructor(private userService: UserService) {}
+  constructor(
+    private userService: UserService,
+    private profilePictureService: ProfilePictureService,
+  ) {}
 
   @Post()
   @HttpCode(200)
@@ -109,6 +117,33 @@ export class UserController {
     return {
       message: 'Profile berhasil diperbarui',
       data: response,
+    };
+  }
+  @Post('/profile/picture')
+  @HttpCode(200)
+  @Roles([1, 2, 3, 4])
+  @UseInterceptors(FileInterceptor('profile_picture'))
+  async uploadProfilePicture(
+    @Auth() user: User,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<WebResponse<{ profile_picture_url: string }>> {
+    const photoUrl = await this.profilePictureService.uploadProfilePicture(
+      user.id,
+      file,
+    );
+    return {
+      message: 'Profile picture uploaded successfully',
+      data: { profile_picture_url: photoUrl },
+    };
+  }
+
+  @Delete('/profile/picture')
+  @HttpCode(200)
+  @Roles([1, 2, 3, 4])
+  async deleteProfilePicture(@Auth() user: User): Promise<WebResponse<void>> {
+    await this.profilePictureService.deleteProfilePicture(user.id);
+    return {
+      message: 'Profile picture deleted successfully',
     };
   }
 }

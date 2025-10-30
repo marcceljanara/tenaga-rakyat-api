@@ -46,6 +46,9 @@ model UserPhotos {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
+  @@map("user_photos")
+  @@index([user_id])
+
 }
 
 enum VerificationStatus {

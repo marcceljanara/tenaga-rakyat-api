@@ -168,7 +168,14 @@ export class UserService {
       where: {
         id: userId,
       },
-      include: { role: true },
+      include: {
+        role: true,
+        user_photos: {
+          orderBy: {
+            created_at: 'desc',
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -192,7 +199,14 @@ export class UserService {
         id: userId,
       },
       data: userRequest,
-      include: { role: true },
+      include: {
+        role: true,
+        user_photos: {
+          orderBy: {
+            created_at: 'desc',
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -203,7 +217,12 @@ export class UserService {
   }
 
   toUserResponse(
-    response: Prisma.UserGetPayload<{ include: { role: true } }>,
+    response: Prisma.UserGetPayload<{
+      include: {
+        role: true;
+        user_photos: true;
+      };
+    }>,
   ): UserResponse {
     return {
       id: response.id,
@@ -216,6 +235,13 @@ export class UserService {
       verification_status: response.verification_status,
       about: response.about,
       cv_url: response.cv_url,
+      photos: response.user_photos?.map((photo) => ({
+        id: photo.id.toString(),
+        photo_url: photo.photo_url,
+        description: photo.description,
+        created_at: photo.created_at,
+        updated_at: photo.updated_at,
+      })),
       update_at: response.updated_at,
       created_at: response.created_at,
     };

@@ -277,4 +277,100 @@ describe('UserController', () => {
       expect(response.body.data.cv_url).toBe(payload.cv_url);
     });
   });
+  describe('POST /api/users/profile/picture', () => {
+    beforeEach(async () => {
+      await testService.deleteAll();
+    });
+
+    it('should reject if user not logged in', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/users/profile/picture')
+        .attach('profile_picture', Buffer.from('dummy'), 'dummy.jpg');
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(401);
+      expect(response.body.errors).toBeDefined();
+    });
+
+    it('should be able to upload profile picture successfully', async () => {
+      // Arrange — login user
+      await testService.addUser();
+      const login = await request(app.getHttpServer())
+        .post('/api/users/login')
+        .send({
+          email: 'test@email.com',
+          password: '1234test',
+        });
+      const userCookie = login.headers['set-cookie'];
+
+      // Action — upload file
+      const response = await request(app.getHttpServer())
+        .post('/api/users/profile/picture')
+        .set('Cookie', userCookie)
+        .attach(
+          'profile_picture',
+          Buffer.from('fake-image-data'),
+          'profile.jpg',
+        );
+
+      // Assert
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.message).toBe(
+        'Profile picture uploaded successfully',
+      );
+      expect(response.body.data).toBeDefined();
+      expect(response.body.data.profile_picture_url).toMatch(
+        /^https?:\/\/|^\/uploads/,
+      ); // tergantung implementasi service upload
+    });
+  });
+
+  describe('DELETE /api/users/profile/picture', () => {
+    beforeEach(async () => {
+      await testService.deleteAll();
+    });
+
+    it('should reject if user not logged in', async () => {
+      const response = await request(app.getHttpServer()).delete(
+        '/api/users/profile/picture',
+      );
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(401);
+      expect(response.body.errors).toBeDefined();
+    });
+
+    it('should be able to delete profile picture successfully', async () => {
+      // Arrange — login user & upload dulu
+      await testService.addUser();
+      const login = await request(app.getHttpServer())
+        .post('/api/users/login')
+        .send({
+          email: 'test@email.com',
+          password: '1234test',
+        });
+      const userCookie = login.headers['set-cookie'];
+
+      // Upload foto dulu biar ada datanya
+      await request(app.getHttpServer())
+        .post('/api/users/profile/picture')
+        .set('Cookie', userCookie)
+        .attach('profile_picture', Buffer.from('fake'), 'test.jpg')
+        .expect(200);
+
+      // Action — delete foto
+      const response = await request(app.getHttpServer())
+        .delete('/api/users/profile/picture')
+        .set('Cookie', userCookie)
+        .send();
+
+      // Assert
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.message).toBe(
+        'Profile picture deleted successfully',
+      );
+    });
+  });
 });
