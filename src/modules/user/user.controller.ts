@@ -25,6 +25,7 @@ import { Roles } from '../../common/role/role.decorator';
 import type { User } from '@prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProfilePictureService } from './profile-picture.service';
+import { ROLES } from '../../common/role/role';
 
 @Controller('/api/users')
 export class UserController {
@@ -98,7 +99,7 @@ export class UserController {
 
   @Get('/profile')
   @HttpCode(200)
-  @Roles([1, 2, 3, 4])
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   async profile(@Auth() user: User): Promise<WebResponse<UserResponse>> {
     const response = await this.userService.profile(user.id);
     return {
@@ -108,7 +109,7 @@ export class UserController {
 
   @Put('/profile')
   @HttpCode(200)
-  @Roles([1, 2, 3, 4])
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   async editProfile(
     @Auth() user: User,
     @Body() request: EditUserRequest,
@@ -121,7 +122,7 @@ export class UserController {
   }
   @Post('/profile/picture')
   @HttpCode(200)
-  @Roles([1, 2, 3, 4])
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   @UseInterceptors(FileInterceptor('profile_picture'))
   async uploadProfilePicture(
     @Auth() user: User,
@@ -139,7 +140,7 @@ export class UserController {
 
   @Delete('/profile/picture')
   @HttpCode(200)
-  @Roles([1, 2, 3, 4])
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   async deleteProfilePicture(@Auth() user: User): Promise<WebResponse<void>> {
     await this.profilePictureService.deleteProfilePicture(user.id);
     return {

@@ -22,6 +22,7 @@ import { WebResponse } from '../../model/web.model';
 import { Auth } from '../../common/auth/auth.decorator';
 import { Roles } from '../../common/role/role.decorator';
 import type { User } from '@prisma/client';
+import { ROLES } from '../../common/role/role';
 
 @Controller('/api/users/photos')
 export class UserPhotoController {
@@ -29,7 +30,7 @@ export class UserPhotoController {
 
   @Post()
   @HttpCode(201)
-  @Roles([1, 2, 3, 4])
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   @UseInterceptors(FileInterceptor('photo'))
   async addPhoto(
     @Auth() user: User,
@@ -45,7 +46,7 @@ export class UserPhotoController {
 
   @Get()
   @HttpCode(200)
-  @Roles([1, 2, 3, 4])
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   async getUserPhotos(
     @Auth() user: User,
   ): Promise<WebResponse<UserPhotoResponse[]>> {
@@ -57,7 +58,7 @@ export class UserPhotoController {
 
   @Get('/:photoId')
   @HttpCode(200)
-  @Roles([1, 2, 3, 4])
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   async getPhotoById(
     @Auth() user: User,
     @Param('photoId', ParseIntPipe) photoId: number,
@@ -73,7 +74,7 @@ export class UserPhotoController {
 
   @Put('/:photoId')
   @HttpCode(200)
-  @Roles([1, 2, 3, 4])
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   async editPhotoDescription(
     @Auth() user: User,
     @Param('photoId', ParseIntPipe) photoId: number,
@@ -92,7 +93,7 @@ export class UserPhotoController {
 
   @Delete('/:photoId')
   @HttpCode(200)
-  @Roles([1, 2, 3, 4])
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   async deletePhoto(
     @Auth() user: User,
     @Param('photoId', ParseIntPipe) photoId: number,
