@@ -51,6 +51,13 @@ export class CommonModule implements NestModule {
         '/api/users/profile/*',
         '/api/users/photos',
         '/api/users/photos/*',
+        '/api/users/applications',
+        '/api/users/applications/*',
+        '/api/jobs',
+        '/api/jobs/:jobId',
+        '/api/jobs/:jobId/*',
+        '/api/applications',
+        '/api/applications/*',
       );
   }
 }
