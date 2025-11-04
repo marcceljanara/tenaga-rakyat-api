@@ -5,6 +5,7 @@ import { UserPhotoModule } from './modules/user-photo/user-photo.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { ApplicationModule } from './modules/application/application.module';
+import { JobModule } from './modules/job/job.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ApplicationModule } from './modules/application/application.module';
       serveRoot: '/uploads',
     }),
     ApplicationModule,
+    JobModule,
   ],
   controllers: [],
   providers: [],

@@ -14,7 +14,7 @@ describe('UserPhotoController', () => {
   let logger: Logger;
   let testService: TestService;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule, TestModule],
     }).compile();
@@ -25,6 +25,11 @@ describe('UserPhotoController', () => {
 
     logger = app.get(WINSTON_MODULE_PROVIDER);
     testService = app.get(TestService);
+  });
+
+  afterAll(async () => {
+    await testService.disconnect();
+    await app.close();
   });
 
   describe('User Photos Endpoints', () => {

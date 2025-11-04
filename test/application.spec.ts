@@ -14,7 +14,7 @@ describe('ApplicationController', () => {
   let logger: Logger;
   let testService: TestService;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule, TestModule],
     }).compile();
@@ -25,6 +25,11 @@ describe('ApplicationController', () => {
 
     logger = app.get(WINSTON_MODULE_PROVIDER);
     testService = app.get(TestService);
+  });
+
+  afterAll(async () => {
+    await testService.disconnect();
+    await app.close();
   });
 
   describe('POST /api/jobs/:jobId/applications - Apply Job', () => {

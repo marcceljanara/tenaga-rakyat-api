@@ -1,4 +1,10 @@
-import { Global, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import {
+  Global,
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { WinstonModule } from 'nest-winston';
 import winston from 'winston';
@@ -46,6 +52,16 @@ export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(AuthMiddleware)
+      .exclude(
+        {
+          path: '/api/jobs/:jobId',
+          method: RequestMethod.GET,
+        },
+        {
+          path: '/api/jobs',
+          method: RequestMethod.GET,
+        },
+      )
       .forRoutes(
         '/api/users/profile',
         '/api/users/profile/*',
@@ -56,6 +72,7 @@ export class CommonModule implements NestModule {
         '/api/jobs',
         '/api/jobs/:jobId',
         '/api/jobs/:jobId/*',
+        '/api/jobs/provider/*',
         '/api/applications',
         '/api/applications/*',
       );
