@@ -50,14 +50,10 @@ export class UserPhotoService {
     if (!file) {
       throw new HttpException('Photo file is required', 400);
     }
+    console.log(file.mimetype);
 
     // Validate file type
-    const allowedMimeTypes = [
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/webp',
-    ];
+    const allowedMimeTypes = ['multipart/form-data'];
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new HttpException(
         'Invalid file type. Only JPEG, PNG, and WebP are allowed',
