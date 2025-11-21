@@ -49,6 +49,7 @@ export class PaymentController {
   @Post('/webhook/midtrans')
   @HttpCode(200)
   async midtransCallback(@Body() body: TopupCallbackRequest) {
+    console.log('Midtrans callback received:', body);
     await this.paymentService.handleCallback(body);
     return { message: 'OK' };
   }

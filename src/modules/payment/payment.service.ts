@@ -29,7 +29,7 @@ export class PaymentService {
   async addBalance(request: AddBalanceWalletInitRequest): Promise<void> {
     this.logger.debug(`Add balance wallet initial ${JSON.stringify(request)}`);
     const userRequest: AddBalanceWalletInitRequest =
-      this.validationService.validate(PaymentValidation.TOPUP_WALLET, request);
+      this.validationService.validate(PaymentValidation.TOPUP_ADMIN, request);
 
     await this.prismaService.$transaction(async (tx) => {
       const wallet = await tx.wallet.updateMany({
@@ -62,12 +62,20 @@ export class PaymentService {
       request,
     );
 
+    // Ambil wallet user
+    const wallet = await this.prismaService.wallet.findUnique({
+      where: {
+        user_id: user.id,
+      },
+    });
+
     // Simpan transaksi pending di database
     const transaction = await this.prismaService.transaction.create({
       data: {
         amount: userRequest.balance,
         transaction_type: TransactionType.FUNDING,
         status: TransactonStatus.PENDING,
+        source_wallet_id: wallet?.id || null,
       },
     });
 
@@ -96,13 +104,14 @@ export class PaymentService {
     }
 
     // update status DB
+    const orderId: number = Number(body.order_id);
     if (body.transaction_status === 'settlement') {
-      await this.completeTopup(body.order_id);
+      await this.completeTopup(orderId);
     }
     return { success: true };
   }
 
-  async completeTopup(orderId: string) {
+  async completeTopup(orderId: number) {
     await this.prismaService.$transaction(async (tx) => {
       const trx = await tx.transaction.findUnique({
         where: { id: Number(orderId) },
@@ -113,13 +122,13 @@ export class PaymentService {
 
       // Tambah saldo
       await tx.wallet.update({
-        where: { id: trx.source_wallet_id },
+        where: { id: Number(trx.source_wallet_id) },
         data: { balance: { increment: trx.amount } },
       });
 
       // Update status transaksi
       await tx.transaction.update({
-        where: { order_id: orderId },
+        where: { id: orderId },
         data: { status: TransactonStatus.COMPLETED },
       });
     });
