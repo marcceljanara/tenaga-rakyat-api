@@ -8,8 +8,8 @@ export class ApplicationValidation {
   });
 
   static readonly UPDATE_STATUS = z.object({
-    status: z.enum(['ACCEPTED', 'REJECTED'], {
-      message: 'Status hanya boleh ACCEPTED atau REJECTED',
+    status: z.enum(['ACCEPTED', 'REJECTED', 'UNDER_REVIEW'], {
+      message: 'Status hanya boleh ACCEPTED, REJECTED atau UNDER_REVIEW',
     }),
   });
 

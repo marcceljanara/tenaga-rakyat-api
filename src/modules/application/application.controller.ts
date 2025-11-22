@@ -195,10 +195,13 @@ export class ApplicationController {
       request,
     );
 
-    const message =
-      request.status === 'ACCEPTED'
-        ? 'Pelamar berhasil diterima'
-        : 'Pelamar berhasil ditolak';
+    const messages = {
+      ACCEPTED: 'Pelamar berhasil diterima',
+      REJECTED: 'Pelamar berhasil ditolak',
+      UNDER_REVIEW: 'Lamaran sedang ditinjau',
+    };
+
+    const message = messages[request.status] || 'Status tidak dikenal';
 
     return {
       message,

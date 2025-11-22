@@ -3,7 +3,7 @@ export class ApplyJobRequest {
 }
 
 export class UpdateApplicationStatusRequest {
-  status: 'ACCEPTED' | 'REJECTED';
+  status: 'ACCEPTED' | 'REJECTED' | 'UNDER_REVIEW';
 }
 
 export class ApplicationResponse {
