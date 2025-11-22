@@ -116,6 +116,13 @@ export class JobService {
       );
     }
 
+    if (job.worker_id) {
+      throw new HttpException(
+        'Lowongan yang sudah memiliki pekerja tidak dapat diubah',
+        400,
+      );
+    }
+
     // Update job
     const updatedJob = await this.prismaService.job.update({
       where: { id: jobId },
