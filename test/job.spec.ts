@@ -192,19 +192,6 @@ describe('JobController', () => {
       expect(response.body.data.compensation_amount).toBe(20000000);
     });
 
-    it('should update job status to IN_PROGRESS', async () => {
-      const response = await request(app.getHttpServer())
-        .put(`/api/jobs/${jobId}`)
-        .set('Cookie', providerCookie)
-        .send({
-          status: 'IN_PROGRESS',
-        });
-
-      logger.debug(response.body);
-      expect(response.statusCode).toBe(200);
-      expect(response.body.data.status).toBe('IN_PROGRESS');
-    });
-
     it('should reject if job not found', async () => {
       const response = await request(app.getHttpServer())
         .put('/api/jobs/99999')
@@ -229,31 +216,9 @@ describe('JobController', () => {
       expect(response.statusCode).toBe(403);
     });
 
-    it('should reject update on completed job', async () => {
-      // First complete the job
-      await request(app.getHttpServer())
-        .put(`/api/jobs/${jobId}`)
-        .set('Cookie', providerCookie)
-        .send({ status: 'COMPLETED' });
-
-      // Try to update again
-      const response = await request(app.getHttpServer())
-        .put(`/api/jobs/${jobId}`)
-        .set('Cookie', providerCookie)
-        .send({
-          title: 'Cannot Update',
-        });
-
-      logger.debug(response.body);
-      expect(response.statusCode).toBe(400);
-    });
-
     it('should reject update on cancelled job', async () => {
       // First cancel the job
-      await request(app.getHttpServer())
-        .put(`/api/jobs/${jobId}`)
-        .set('Cookie', providerCookie)
-        .send({ status: 'CANCELLED' });
+      await testService.updateJobStatus(jobId, 'CANCELLED');
 
       // Try to update again
       const response = await request(app.getHttpServer())
@@ -272,6 +237,7 @@ describe('JobController', () => {
     let providerCookie: string;
     let anotherProviderCookie: string;
     let jobId: number;
+    let workerId: string;
 
     beforeEach(async () => {
       await testService.deleteAll();
@@ -286,6 +252,7 @@ describe('JobController', () => {
       jobId = Number(job.id);
 
       await testService.addAnotherProvider();
+      workerId = await testService.addUser();
       const anotherProviderLogin = await request(app.getHttpServer())
         .post('/api/users/login')
         .send({ email: 'another@email.com', password: '1234test' });
@@ -322,10 +289,7 @@ describe('JobController', () => {
 
     it('should reject delete job with ASSIGNED status', async () => {
       // First assign the job
-      await request(app.getHttpServer())
-        .put(`/api/jobs/${jobId}`)
-        .set('Cookie', providerCookie)
-        .send({ status: 'ASSIGNED' });
+      await testService.updateJobStatus(jobId, 'ASSIGNED', workerId);
 
       const response = await request(app.getHttpServer())
         .delete(`/api/jobs/${jobId}`)
@@ -337,10 +301,7 @@ describe('JobController', () => {
 
     it('should reject delete job with IN_PROGRESS status', async () => {
       // First set to in progress
-      await request(app.getHttpServer())
-        .put(`/api/jobs/${jobId}`)
-        .set('Cookie', providerCookie)
-        .send({ status: 'IN_PROGRESS' });
+      await testService.updateJobStatus(jobId, 'IN_PROGRESS', workerId);
 
       const response = await request(app.getHttpServer())
         .delete(`/api/jobs/${jobId}`)

@@ -20,7 +20,7 @@ export class TestService {
   }
 
   async addUser() {
-    await this.prismaService.user.create({
+    const user = await this.prismaService.user.create({
       data: {
         id: randomUUID(),
         email: 'test@email.com',
@@ -30,6 +30,8 @@ export class TestService {
         role_id: 1,
       },
     });
+
+    return user.id;
   }
 
   async addAnotherUser() {
@@ -112,11 +114,12 @@ export class TestService {
     return job;
   }
 
-  async updateJobStatus(jobId: number, status: string) {
+  async updateJobStatus(jobId: number, status: string, workerId?: string) {
     const job = await this.prismaService.job.update({
       where: { id: jobId },
       data: {
         status: status as any,
+        worker_id: workerId ? workerId : null,
         ...(status === 'COMPLETED' && { completed_at: new Date() }),
       },
     });
