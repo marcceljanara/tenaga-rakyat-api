@@ -24,6 +24,8 @@ model User {
   wallets Wallet?
   providedJobs Job[] @relation("ProvidedJobs")
   workedJobs   Job[] @relation("WorkedJobs")
+  workerEscrow Escrow[] @relation("WorkerEscrow")
+  providerEscrow Escrow[] @relation("ProviderEscrow")
   jobApplications JobApplication[]
   profile_picture_url String? @db.VarChar(255)
   about String? @db.Text
@@ -89,6 +91,7 @@ model Job {
   worker User? @relation("WorkedJobs", fields: [worker_id], references: [id], onDelete: SetNull)
   jobTransactions Transaction[]
   jobApplications JobApplication[]
+  jobEscrow Escrow?
   title String @db.VarChar(255)
   description String @db.Text
   location String? @db.VarChar(255)
@@ -179,4 +182,27 @@ enum TransactonStatus {
   PENDING
   COMPLETED
   FAILED
+}
+
+model Escrow {
+  id BigInt @id @default(autoincrement())
+  job_id BigInt @unique
+  job Job @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  provider_id String 
+  worker_id String
+  provider User @relation("ProviderEscrow", fields: [provider_id], references: [id], onDelete: Cascade)
+  worker User @relation("WorkerEscrow", fields: [worker_id], references: [id], onDelete: Cascade)
+  amount Decimal @db.Decimal(12, 2)
+  status EscrowStatus @default(HELD)
+  created_at DateTime @default(now())
+  released_at DateTime? @db.Timestamptz()
+  refunded_at DateTime? @db.Timestamptz()
+
+  @@map("escrows")
+}
+
+enum EscrowStatus {
+  HELD
+  RELEASED
+  REFUNDED
 }
