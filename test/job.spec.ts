@@ -619,4 +619,104 @@ describe('JobController', () => {
       expect(response.statusCode).toBe(401);
     });
   });
+  describe('PATCH /api/jobs/:jobId/status/worker - Worker Update Job Status', () => {
+    let workerCookie: string;
+    let providerId: string;
+    let workerId: string;
+    let jobId: number;
+
+    beforeEach(async () => {
+      await testService.deleteAll();
+
+      // Buat provider & job
+      providerId = await testService.addProvider();
+      const job = await testService.createJob(providerId);
+      jobId = Number(job.id);
+
+      // Buat worker
+      workerId = await testService.addUser();
+      const workerLogin = await request(app.getHttpServer())
+        .post('/api/users/login')
+        .send({ email: 'test@email.com', password: '1234test' });
+      workerCookie = workerLogin.headers['set-cookie'];
+
+      // Assign job ke worker
+      await testService.updateJobStatus(jobId, 'ASSIGNED', workerId);
+    });
+
+    it('should allow worker to set job to IN_PROGRESS', async () => {
+      const response = await request(app.getHttpServer())
+        .patch(`/api/jobs/${jobId}/status/worker`)
+        .set('Cookie', workerCookie)
+        .send({ status: 'IN_PROGRESS' });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body.message).toBe(
+        'Status pekerjaan berhasil diperbarui',
+      );
+    });
+
+    it('should allow worker to set job to COMPLETED', async () => {
+      const response = await request(app.getHttpServer())
+        .patch(`/api/jobs/${jobId}/status/worker`)
+        .set('Cookie', workerCookie)
+        .send({ status: 'COMPLETED' });
+
+      expect(response.statusCode).toBe(200);
+    });
+
+    it('should reject if job not found', async () => {
+      const response = await request(app.getHttpServer())
+        .patch('/api/jobs/999999/status/worker')
+        .set('Cookie', workerCookie)
+        .send({ status: 'IN_PROGRESS' });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('should reject if job does not belong to worker', async () => {
+      // Buat worker lain
+      await testService.addAnotherUser();
+      const otherWorkerLogin = await request(app.getHttpServer())
+        .post('/api/users/login')
+        .send({ email: 'another@email.com', password: '1234test' });
+
+      const otherCookie = otherWorkerLogin.headers['set-cookie'];
+
+      const response = await request(app.getHttpServer())
+        .patch(`/api/jobs/${jobId}/status/worker`)
+        .set('Cookie', otherCookie)
+        .send({ status: 'IN_PROGRESS' });
+
+      expect(response.statusCode).toBe(403);
+    });
+
+    it('should reject updating job that is already APPROVED or REJECTED', async () => {
+      await testService.updateJobStatus(jobId, 'APPROVED', workerId);
+
+      const response = await request(app.getHttpServer())
+        .patch(`/api/jobs/${jobId}/status/worker`)
+        .set('Cookie', workerCookie)
+        .send({ status: 'IN_PROGRESS' });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('should reject invalid status', async () => {
+      const response = await request(app.getHttpServer())
+        .patch(`/api/jobs/${jobId}/status/worker`)
+        .set('Cookie', workerCookie)
+        .send({ status: 'INVALID_STATUS' });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('should reject if not authenticated', async () => {
+      const response = await request(app.getHttpServer())
+        .patch(`/api/jobs/${jobId}/status/worker`)
+        .send({ status: 'COMPLETED' });
+
+      expect(response.statusCode).toBe(401);
+    });
+  });
 });
