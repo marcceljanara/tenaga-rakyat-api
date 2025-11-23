@@ -10,7 +10,10 @@ export class UpdateJobRequest {
   description?: string;
   location?: string;
   compensation_amount?: number;
-  status?: 'OPEN' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+}
+
+export class UpdateWorkerJobStatusRequest {
+  status: 'IN_PROGRESS' | 'COMPLETED';
 }
 
 export class JobResponse {

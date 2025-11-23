@@ -10,6 +10,7 @@ import {
   JobListResponse,
   JobSearchQuery,
   ProviderJobHistoryQuery,
+  UpdateWorkerJobStatusRequest,
 } from '../../model/job.model';
 import { JobValidation } from './job.validation';
 import { JobStatus, Prisma } from '@prisma/client';
@@ -106,10 +107,7 @@ export class JobService {
     }
 
     // Tidak bisa update jika sudah COMPLETED atau CANCELLED
-    if (
-      job.status === JobStatus.COMPLETED ||
-      job.status === JobStatus.CANCELLED
-    ) {
+    if (job.status === JobStatus.CANCELLED) {
       throw new HttpException(
         'Lowongan yang sudah selesai atau dibatalkan tidak dapat diubah',
         400,
@@ -128,9 +126,9 @@ export class JobService {
       where: { id: jobId },
       data: {
         ...updateRequest,
-        ...(updateRequest.status === 'COMPLETED' && {
+        ...{
           completed_at: new Date(),
-        }),
+        },
       },
       include: {
         provider: {
@@ -184,10 +182,7 @@ export class JobService {
     }
 
     // Tidak bisa hapus jika ada aplikasi yang sudah diterima atau sedang in progress
-    if (
-      job.status === JobStatus.ASSIGNED ||
-      job.status === JobStatus.IN_PROGRESS
-    ) {
+    if (job.worker_id) {
       throw new HttpException(
         'Lowongan yang sudah memiliki pekerja tidak dapat dihapus',
         400,
@@ -197,6 +192,52 @@ export class JobService {
     // Hapus job (cascade akan menghapus jobApplications)
     await this.prismaService.job.delete({
       where: { id: jobId },
+    });
+  }
+
+  async updateWorkerJobStatus(
+    jobId: number,
+    workerId: string,
+    request: UpdateWorkerJobStatusRequest,
+  ): Promise<void> {
+    this.logger.debug(`Updating job status for job ${jobId}`);
+    const userRequest: UpdateWorkerJobStatusRequest =
+      this.validationService.validate(
+        JobValidation.UPDATE_WORKER_JOB_STATUS,
+        request,
+      );
+    // Cek apakah job ada dan milik worker ini
+    const job = await this.prismaService.job.findUnique({
+      where: {
+        id: jobId,
+      },
+    });
+
+    if (!job) {
+      throw new HttpException('Lowongan tidak ditemukan', 404);
+    }
+    if (job.worker_id !== workerId) {
+      throw new HttpException('Anda tidak memiliki akses ke lowongan ini', 403);
+    }
+
+    if (
+      job.status === JobStatus.APPROVED ||
+      job.status === JobStatus.REJECTED
+    ) {
+      throw new HttpException(
+        'Lowongan yang sudah disetujui atau ditolak tidak dapat diubah',
+        400,
+      );
+    }
+
+    // Update status job
+    await this.prismaService.job.update({
+      where: {
+        id: jobId,
+      },
+      data: {
+        status: userRequest.status,
+      },
     });
   }
 

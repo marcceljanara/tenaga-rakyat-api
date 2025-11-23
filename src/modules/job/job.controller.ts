@@ -6,6 +6,7 @@ import {
   HttpCode,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Put,
   Query,
@@ -16,6 +17,7 @@ import {
   UpdateJobRequest,
   JobResponse,
   JobListResponse,
+  UpdateWorkerJobStatusRequest,
 } from '../../model/job.model';
 import { WebResponse } from '../../model/web.model';
 import { Auth } from '../../common/auth/auth.decorator';
@@ -199,6 +201,25 @@ export class JobController {
     const result = await this.jobService.getCompletedJobs(user.id);
     return {
       data: result,
+    };
+  }
+
+  /**
+   * PATCH /api/jobs/{job_id}/status/worker
+   * Mengubah status pekerjaan oleh pekerja menjadi IN_PROGRESS atau COMPLETED
+   * Role: WORKER (1)
+   */
+  @Patch('/:jobId/status/worker')
+  @HttpCode(200)
+  @Roles([ROLES.PEKERJA])
+  async updateWorkerJobStatus(
+    @Auth() user: User,
+    @Param('jobId', ParseIntPipe) jobId: number,
+    @Body() request: UpdateWorkerJobStatusRequest,
+  ): Promise<WebResponse<string>> {
+    await this.jobService.updateWorkerJobStatus(jobId, user.id, request);
+    return {
+      message: 'Status pekerjaan berhasil diperbarui',
     };
   }
 }

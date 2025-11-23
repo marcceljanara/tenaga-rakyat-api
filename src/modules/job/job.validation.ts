@@ -16,9 +16,10 @@ export class JobValidation {
     description: z.string().min(20).max(5000).optional(),
     location: z.string().max(255).optional(),
     compensation_amount: z.number().positive().max(999999999999).optional(),
-    status: z
-      .enum(['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'])
-      .optional(),
+  });
+
+  static readonly UPDATE_WORKER_JOB_STATUS = z.object({
+    status: z.enum(['IN_PROGRESS', 'COMPLETED']),
   });
 
   static readonly SEARCH_QUERY = z.object({
