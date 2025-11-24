@@ -11,6 +11,7 @@ import {
   JobSearchQuery,
   ProviderJobHistoryQuery,
   UpdateWorkerJobStatusRequest,
+  UpdateEmployerJobStatusRequest,
 } from '../../model/job.model';
 import { JobValidation } from './job.validation';
 import { JobStatus, Prisma } from '@prisma/client';
@@ -220,12 +221,9 @@ export class JobService {
       throw new HttpException('Anda tidak memiliki akses ke lowongan ini', 403);
     }
 
-    if (
-      job.status === JobStatus.APPROVED ||
-      job.status === JobStatus.REJECTED
-    ) {
+    if (job.status === JobStatus.APPROVED) {
       throw new HttpException(
-        'Lowongan yang sudah disetujui atau ditolak tidak dapat diubah',
+        'Lowongan yang sudah disetujui tidak dapat diubah',
         400,
       );
     }
@@ -239,6 +237,135 @@ export class JobService {
         status: userRequest.status,
       },
     });
+  }
+
+  async updateEmployerJobStatus(
+    jobId: number,
+    providerId: string,
+    request: UpdateEmployerJobStatusRequest,
+  ): Promise<string> {
+    this.logger.debug(`Updating job status for job ${jobId}`);
+    const userRequest: UpdateEmployerJobStatusRequest =
+      this.validationService.validate(
+        JobValidation.UPDATE_EMPLOYER_JOB_STATUS,
+        request,
+      );
+
+    // Cek apakah job ada dan milik provider ini
+    const job = await this.prismaService.job.findUnique({
+      where: {
+        id: jobId,
+      },
+    });
+
+    if (!job) throw new HttpException('Lowongan tidak ditemukan', 404);
+
+    if (job.provider_id !== providerId)
+      throw new HttpException('Anda tidak memiliki akses ke lowongan ini', 403);
+
+    // Periksa Pembatalan
+    if (userRequest.status === 'CANCELLED') {
+      if (job.worker_id) {
+        throw new HttpException(
+          'Lowongan yang sudah memiliki pekerja tidak dapat dibatalkan',
+          400,
+        );
+      }
+      await this.prismaService.job.update({
+        where: {
+          id: jobId,
+        },
+        data: {
+          status: 'CANCELLED',
+        },
+      });
+
+      return 'Lowongan berhasil dibatalkan';
+    } else if (userRequest.status === 'REJECTED') {
+      // Periksa Penolakan
+      if (job.status !== 'COMPLETED') {
+        throw new HttpException(
+          'Hanya lowongan dengan status COMPLETED yang dapat ditolak',
+          400,
+        );
+      }
+      // Periska batasan penolakan
+      await this.prismaService.job.update({
+        where: {
+          id: jobId,
+        },
+        data: {
+          status: 'REJECTED',
+          rejection_count: {
+            increment: 1,
+          },
+        },
+      });
+      const updated = job.rejection_count + 1;
+      if (updated >= 3) {
+        // kirim notifikasi admin di sini
+      }
+
+      return 'Pekerjaan berhasil ditolak';
+    } else if (userRequest.status === 'APPROVED') {
+      // Periksa Persetujuan
+      if (job.status !== 'COMPLETED') {
+        throw new HttpException(
+          'Hanya lowongan dengan status COMPLETED yang dapat disetujui',
+          400,
+        );
+      }
+      if (!job.worker_id) {
+        throw new HttpException('Job tidak memiliki pekerja', 400);
+      }
+      await this.prismaService.$transaction(async (tx) => {
+        await tx.job.update({
+          where: {
+            id: jobId,
+          },
+          data: {
+            status: 'APPROVED',
+          },
+        });
+        await tx.escrow.updateMany({
+          where: {
+            job_id: jobId,
+          },
+          data: {
+            status: 'RELEASED',
+            released_at: new Date(),
+          },
+        });
+
+        // Ambil escrow amount secara eksplisit
+        const escrowRecord = await tx.escrow.findFirst({
+          where: { job_id: jobId },
+        });
+        if (!escrowRecord)
+          throw new HttpException('Escrow tidak ditemukan', 400);
+        await tx.wallet.update({
+          where: {
+            user_id: job.worker_id!,
+          },
+          data: {
+            balance: {
+              increment: escrowRecord.amount,
+            },
+          },
+        });
+        await tx.transaction.update({
+          where: {
+            job_id: jobId,
+          },
+          data: {
+            status: 'COMPLETED',
+          },
+        });
+      });
+
+      return 'Pekerjaan berhasil disetujui dan pembayaran telah dirilis';
+    }
+    return 'Status pekerjaan tidak diubah';
   }
 
   async getJobDetail(jobId: number): Promise<JobResponse> {

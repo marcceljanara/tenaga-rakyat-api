@@ -22,6 +22,10 @@ export class JobValidation {
     status: z.enum(['IN_PROGRESS', 'COMPLETED']),
   });
 
+  static readonly UPDATE_EMPLOYER_JOB_STATUS = z.object({
+    status: z.enum(['CANCELLED', 'APPROVED', 'REJECTED']),
+  });
+
   static readonly SEARCH_QUERY = z.object({
     keyword: z.string().optional(),
     location: z.string().optional(),

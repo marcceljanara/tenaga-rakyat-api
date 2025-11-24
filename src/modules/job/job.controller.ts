@@ -18,6 +18,7 @@ import {
   JobResponse,
   JobListResponse,
   UpdateWorkerJobStatusRequest,
+  UpdateEmployerJobStatusRequest,
 } from '../../model/job.model';
 import { WebResponse } from '../../model/web.model';
 import { Auth } from '../../common/auth/auth.decorator';
@@ -220,6 +221,28 @@ export class JobController {
     await this.jobService.updateWorkerJobStatus(jobId, user.id, request);
     return {
       message: 'Status pekerjaan berhasil diperbarui',
+    };
+  }
+  /**
+   * PATCH /api/jobs/{job_id}/status/employer
+   * Mengubah status pekerjaan oleh pemberi kerja menjadi CANCELLED, APPROVED atau REJECTED
+   * Role: Pemberi Kerja (2)
+   */
+  @Patch('/:jobId/status/employer')
+  @HttpCode(200)
+  @Roles([ROLES.PEMBERI_KERJA])
+  async updateEmployerJobStatus(
+    @Auth() user: User,
+    @Param('jobId', ParseIntPipe) jobId: number,
+    @Body() request: UpdateEmployerJobStatusRequest,
+  ): Promise<WebResponse<string>> {
+    const result = await this.jobService.updateEmployerJobStatus(
+      jobId,
+      user.id,
+      request,
+    );
+    return {
+      message: result,
     };
   }
 }

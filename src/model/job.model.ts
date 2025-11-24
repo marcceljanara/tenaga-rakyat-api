@@ -16,6 +16,10 @@ export class UpdateWorkerJobStatusRequest {
   status: 'IN_PROGRESS' | 'COMPLETED';
 }
 
+export class UpdateEmployerJobStatusRequest {
+  status: 'CANCELLED' | 'APPROVED' | 'REJECTED';
+}
+
 export class JobResponse {
   id: number;
   provider_id: string;

@@ -12,7 +12,12 @@ import {
   SearchApplicationQuery,
 } from '../../model/application.model';
 import { ApplicationValidation } from './application.validation';
-import { ApplicationStatus, JobStatus, Prisma } from '@prisma/client';
+import {
+  ApplicationStatus,
+  EscrowStatus,
+  JobStatus,
+  Prisma,
+} from '@prisma/client';
 
 @Injectable()
 export class ApplicationService {
@@ -338,11 +343,12 @@ export class ApplicationService {
         request,
       );
 
-    // Cek apakah application ada
+    // Ambil application lengkap (beserta job)
     const application = await this.prismaService.jobApplication.findUnique({
       where: { id: applicationId },
       include: {
         job: true,
+        worker: true,
       },
     });
 
@@ -363,12 +369,162 @@ export class ApplicationService {
       );
     }
 
-    // Update status application
+    if (
+      application.status !== ApplicationStatus.PENDING &&
+      application.status !== ApplicationStatus.UNDER_REVIEW
+    ) {
+      throw new HttpException(
+        'Status lamaran sudah diproses dan tidak dapat diubah',
+        400,
+      );
+    }
+
+    // --- BRANCH ACCEPTED: lakukan semua cek & perubahan di dalam TRANSAKSI ---
+    if (statusRequest.status === ApplicationStatus.ACCEPTED) {
+      // Semua DB op yang berhubungan harus menggunakan `tx`
+      const updatedApplication = await this.prismaService.$transaction(
+        async (tx) => {
+          // Ambil job (pakai tx) — kita butuh compensation_amount
+          const jobRecord = await tx.job.findUnique({
+            where: { id: application.job_id },
+            select: { id: true, compensation_amount: true, status: true },
+          });
+
+          if (!jobRecord) {
+            throw new HttpException('Job tidak ditemukan', 404);
+          }
+
+          // Pastikan job masih OPEN (double-check di dalam tx)
+          if (jobRecord.status !== JobStatus.OPEN) {
+            throw new HttpException(
+              'Lowongan sudah tidak menerima perubahan status',
+              400,
+            );
+          }
+
+          const compensation = jobRecord.compensation_amount;
+
+          // Ambil wallet employer & worker sekaligus
+          const wallets = await tx.wallet.findMany({
+            where: {
+              user_id: { in: [providerId, application.worker_id] },
+            },
+            select: { id: true, user_id: true, balance: true },
+          });
+
+          const providerWallet = wallets.find((w) => w.user_id === providerId);
+          const workerWallet = wallets.find(
+            (w) => w.user_id === application.worker_id,
+          );
+
+          if (!providerWallet || !workerWallet) {
+            throw new HttpException('Wallet tidak ditemukan', 400);
+          }
+          // Cek saldo cukup SEBELUM mengubah apa pun
+          if (providerWallet.balance.lessThan(compensation)) {
+            throw new HttpException(
+              'Saldo pemberi kerja tidak mencukupi untuk menahan escrow',
+              400,
+            );
+          }
+
+          // Decrement saldo employer (hold)
+          await tx.wallet.update({
+            where: { id: providerWallet.id },
+            data: { balance: { decrement: compensation } },
+          });
+
+          // Buat escrow record
+          await tx.escrow.create({
+            data: {
+              job_id: application.job_id,
+              amount: compensation,
+              status: EscrowStatus.HELD,
+              provider_id: providerId,
+              worker_id: application.worker_id,
+            },
+          });
+
+          // Catat transaksi wallet (ESCROW_HELD)
+          await tx.transaction.create({
+            data: {
+              job_id: application.job_id,
+              amount: compensation,
+              transaction_type: 'ESCROW_RELEASE',
+              source_wallet_id: providerWallet.id,
+              destination_wallet_id: workerWallet.id,
+              status: 'PENDING',
+            },
+          });
+
+          // Sekarang assign job (paling akhir setelah dana ter-hold)
+          await tx.job.update({
+            where: { id: application.job_id },
+            data: {
+              status: JobStatus.ASSIGNED,
+              worker_id: application.worker_id,
+            },
+          });
+
+          // Reject semua aplikasi lain untuk job ini
+          await tx.jobApplication.updateMany({
+            where: {
+              job_id: application.job_id,
+              id: { not: applicationId },
+              status: {
+                in: [ApplicationStatus.PENDING, ApplicationStatus.UNDER_REVIEW],
+              },
+            },
+            data: { status: ApplicationStatus.REJECTED },
+          });
+
+          // Terakhir: update application yang diterima → set jadi ACCEPTED
+          const updatedApp = await tx.jobApplication.update({
+            where: { id: applicationId },
+            data: { status: ApplicationStatus.ACCEPTED },
+            include: {
+              job: {
+                include: {
+                  provider: {
+                    select: {
+                      id: true,
+                      full_name: true,
+                      profile_picture_url: true,
+                      average_rating: true,
+                    },
+                  },
+                },
+              },
+              worker: {
+                select: {
+                  id: true,
+                  full_name: true,
+                  email: true,
+                  phone_number: true,
+                  profile_picture_url: true,
+                  about: true,
+                  cv_url: true,
+                  average_rating: true,
+                  verification_status: true,
+                },
+              },
+            },
+          });
+
+          // kembalikan updated application dari dalam transaksi
+          return updatedApp;
+        },
+      ); // end transaction
+
+      // map & return
+      return this.mapToApplicationResponse(updatedApplication);
+    }
+
+    // --- BRANCH REJECTED / UNDER_REVIEW / LAINNYA: update application langsung ---
+    // Misal REJECTED: increment rejection_count bisa ditambahkan di sini (nanti)
     const updatedApplication = await this.prismaService.jobApplication.update({
       where: { id: applicationId },
-      data: {
-        status: statusRequest.status as any,
-      },
+      data: { status: statusRequest.status },
       include: {
         job: {
           include: {
@@ -397,32 +553,6 @@ export class ApplicationService {
         },
       },
     });
-
-    // Jika ACCEPTED, update job status menjadi ASSIGNED dan set worker_id
-    if (statusRequest.status === ApplicationStatus.ACCEPTED) {
-      await this.prismaService.job.update({
-        where: { id: application.job_id },
-        data: {
-          status: JobStatus.ASSIGNED,
-          worker_id: application.worker_id,
-        },
-      });
-
-      // Reject semua aplikasi lainnya untuk job ini
-      await this.prismaService.jobApplication.updateMany({
-        where: {
-          job_id: application.job_id,
-          id: { not: applicationId },
-          OR: [
-            { status: ApplicationStatus.UNDER_REVIEW },
-            { status: ApplicationStatus.PENDING },
-          ],
-        },
-        data: {
-          status: ApplicationStatus.REJECTED,
-        },
-      });
-    }
 
     return this.mapToApplicationResponse(updatedApplication);
   }
