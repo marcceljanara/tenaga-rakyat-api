@@ -15,6 +15,9 @@ async function main() {
     ],
     skipDuplicates: true,
   });
+  await prisma.platformWallet.create({
+    data: {},
+  });
 }
 
 main()

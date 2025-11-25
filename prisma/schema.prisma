@@ -209,3 +209,29 @@ enum EscrowStatus {
   RELEASED
   REFUNDED
 }
+
+model PlatformWallet {
+  id BigInt @id @default(autoincrement())
+  balance Decimal @db.Decimal(15,2) @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("platform_wallet")
+}
+
+model PlatformTransaction {
+  id BigInt @id @default(autoincrement())
+  amount Decimal @db.Decimal(15, 2)
+  type PlatformTransactionType
+  reference_id BigInt?
+  description String @db.VarChar(255)
+  created_at DateTime @default(now())
+
+  @@map("platform_transactions")
+}
+
+enum PlatformTransactionType {
+  ESCROW_FEE
+  WITHDRAW_FEE
+  SERVICE_FEE
+}
