@@ -7,6 +7,7 @@ import { join } from 'path';
 import { ApplicationModule } from './modules/application/application.module';
 import { JobModule } from './modules/job/job.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { CronService } from './infrastructure/cron/cron.service';
 
 @Module({
   imports: [
@@ -22,6 +23,6 @@ import { PaymentModule } from './modules/payment/payment.module';
     PaymentModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [CronService],
 })
 export class AppModule {}

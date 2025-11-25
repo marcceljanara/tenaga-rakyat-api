@@ -99,6 +99,7 @@ model Job {
   status JobStatus @default(OPEN)
   rejection_count Int @default(0)
   posted_at DateTime @default(now())
+  updated_at DateTime @updatedAt
   completed_at DateTime? @db.Timestamptz()
 
   @@map("jobs")

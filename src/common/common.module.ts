@@ -14,6 +14,7 @@ import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ErrorFilter } from './error.filter';
 import { AuthMiddleware } from './auth/auth.middleware';
 import { JwtModule, JwtService } from '@nestjs/jwt';
+import { ScheduleModule } from '@nestjs/schedule';
 import { RoleGuard } from './role/role.guard';
 
 @Global()
@@ -31,6 +32,7 @@ import { RoleGuard } from './role/role.guard';
       secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '15m' },
     }),
+    ScheduleModule.forRoot(),
   ],
   providers: [
     JwtService,

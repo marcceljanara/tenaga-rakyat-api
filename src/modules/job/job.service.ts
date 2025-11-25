@@ -325,6 +325,7 @@ export class JobService {
           },
           data: {
             status: 'APPROVED',
+            completed_at: new Date(),
           },
         });
         await tx.escrow.updateMany({
