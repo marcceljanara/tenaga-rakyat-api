@@ -1,4 +1,12 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseIntPipe,
+  Post,
+} from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { Roles } from '../../common/role/role.decorator';
 import { ROLES } from '../../common/role/role';
@@ -8,6 +16,8 @@ import {
   AddBalanceWalletInitRequest,
   TopupCallbackRequest,
   TopupWalletRequest,
+  TransactionListResponse,
+  WalletResponse,
 } from '../../model/payment.model';
 import { WebResponse } from '../../model/web.model';
 
@@ -52,5 +62,38 @@ export class PaymentController {
     console.log('Midtrans callback received:', body);
     await this.paymentService.handleCallback(body);
     return { message: 'OK' };
+  }
+
+  @Post('/wallets/withdraw')
+  @HttpCode(200)
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  async withdrawFund() {
+    // implementation
+  }
+
+  @Get('/wallets')
+  @HttpCode(200)
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  async getWallet(@Auth() user: User): Promise<WebResponse<WalletResponse>> {
+    const result = await this.paymentService.getWallet(user.id);
+    return {
+      data: result,
+    };
+  }
+
+  @Get('/wallets/transactions/:walletId')
+  @HttpCode(200)
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  async getWalletTransaction(
+    @Auth() user: User,
+    @Param('walletId', ParseIntPipe) walletId: number,
+  ): Promise<WebResponse<TransactionListResponse>> {
+    const result = await this.paymentService.getWalletTransaction(
+      walletId,
+      user.id,
+    );
+    return {
+      data: result,
+    };
   }
 }

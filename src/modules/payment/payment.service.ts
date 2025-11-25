@@ -12,6 +12,8 @@ import {
   AddBalanceWalletInitRequest,
   TopupCallbackRequest,
   TopupWalletRequest,
+  TransactionResponse,
+  WalletResponse,
 } from '../../model/payment.model';
 import { PaymentValidation } from './payment.validation';
 import { TransactionType, TransactonStatus, User } from '@prisma/client';
@@ -69,13 +71,18 @@ export class PaymentService {
       },
     });
 
+    if (!wallet) {
+      throw new HttpException('Wallet tidak ditemukan', 404);
+    }
+
     // Simpan transaksi pending di database
     const transaction = await this.prismaService.transaction.create({
       data: {
         amount: userRequest.balance,
         transaction_type: TransactionType.FUNDING,
         status: TransactonStatus.PENDING,
-        source_wallet_id: wallet?.id || null,
+        destination_wallet_id: wallet.id,
+        source_wallet_id: null,
       },
     });
 
@@ -122,7 +129,7 @@ export class PaymentService {
 
       // Tambah saldo
       await tx.wallet.update({
-        where: { id: Number(trx.source_wallet_id) },
+        where: { id: Number(trx.destination_wallet_id) },
         data: { balance: { increment: trx.amount } },
       });
 
@@ -132,5 +139,76 @@ export class PaymentService {
         data: { status: TransactonStatus.COMPLETED },
       });
     });
+  }
+
+  async getWallet(userId: string): Promise<WalletResponse> {
+    const wallet = await this.prismaService.wallet.findUnique({
+      where: {
+        user_id: userId,
+      },
+    });
+
+    if (!wallet) {
+      throw new HttpException('Wallet tidak ditemukan', 404);
+    }
+
+    return this.mapToWalletResponse(wallet);
+  }
+
+  async getWalletTransaction(walletId: number, userId: string) {
+    // Cari wallet yang benar-benar milik user
+    const wallet = await this.prismaService.wallet.findFirst({
+      where: {
+        id: walletId,
+        user_id: userId,
+      },
+    });
+    // console.log(wallet);
+
+    if (!wallet) {
+      throw new HttpException(
+        'Wallet tidak ditemukan atau tidak dimiliki user',
+        404,
+      );
+    }
+
+    // Ambil transaksi wallet tersebut
+    const transactions = await this.prismaService.transaction.findMany({
+      where: {
+        OR: [
+          { destination_wallet_id: walletId },
+          { source_wallet_id: walletId },
+        ],
+      },
+    });
+
+    return {
+      transactions: transactions.map((transaction) =>
+        this.mapToTransactionResponse(transaction),
+      ),
+    };
+  }
+
+  private mapToWalletResponse(wallet: any): WalletResponse {
+    return {
+      id: Number(wallet.id),
+      user_id: wallet.user_id,
+      balance: Number(wallet.balance),
+      status: wallet.status,
+    };
+  }
+
+  private mapToTransactionResponse(transaction: any): TransactionResponse {
+    return {
+      id: Number(transaction.id),
+      source_wallet_id: Number(transaction.source_wallet_id),
+      destination_wallet_id: Number(transaction.destination_wallet_id),
+      job_id: Number(transaction.job_id),
+      amount: Number(transaction.amount),
+      transaction_type: transaction.transaction_type,
+      status: transaction.status,
+      created_at: transaction.created_at,
+      updated_at: transaction.updated_at,
+    };
   }
 }

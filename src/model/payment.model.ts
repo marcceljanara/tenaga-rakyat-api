@@ -41,7 +41,24 @@ export class TopupCallbackRequest {
 }
 
 export class WalletResponse {
-  id: string;
+  id: number;
   user_id: string;
   balance: number;
+  status: string;
+}
+
+export class TransactionListResponse {
+  transactions: TransactionResponse[];
+}
+
+export class TransactionResponse {
+  id: number;
+  source_wallet_id: number | null;
+  destination_wallet_id: number | null;
+  job_id: number | null;
+  amount: number;
+  transaction_type: string | null;
+  status: string;
+  created_at: Date;
+  updated_at: Date;
 }

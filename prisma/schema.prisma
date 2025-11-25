@@ -166,6 +166,7 @@ model Transaction {
   updated_at DateTime @updatedAt
 
   @@map("transactions")
+  @@index([source_wallet_id, destination_wallet_id])
 }
 
 enum WalletStatus {
