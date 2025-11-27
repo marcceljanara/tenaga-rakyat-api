@@ -235,3 +235,20 @@ enum PlatformTransactionType {
   WITHDRAW_FEE
   SERVICE_FEE
 }
+
+model Fee {
+  id BigInt @id @default(autoincrement())
+  name String @unique @db.VarChar(50)
+  value Decimal @db.Decimal(7, 2)
+  fee_type FeeType
+  active Boolean @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("fees")
+}
+
+enum FeeType {
+  PERCENTAGE
+  FIXED
+}

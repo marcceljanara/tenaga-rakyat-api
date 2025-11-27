@@ -15,12 +15,30 @@ async function main() {
     ],
     skipDuplicates: true,
   });
-  await prisma.platformWallet.create({
-    data: {},
+  const wallet = await prisma.platformWallet.findMany();
+  if (!wallet.length) {
+    await prisma.platformWallet.create({
+      data: {},
+    });
+  }
+  await prisma.fee.createMany({
+    data: [
+      {
+        name: 'escrow_fee',
+        value: 5.0,
+        fee_type: 'PERCENTAGE',
+      },
+      {
+        name: 'withdraw_fee',
+        value: 4500,
+        fee_type: 'FIXED',
+      },
+    ],
+    skipDuplicates: true,
   });
 }
 
 main()
-  .then(() => console.log('✅ Roles seeded'))
+  .then(() => console.log('✅ Seeded success!'))
   .catch(console.error)
   .finally(() => prisma.$disconnect());

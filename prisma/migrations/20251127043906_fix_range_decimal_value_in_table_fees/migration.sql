@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "fees" ALTER COLUMN "value" SET DATA TYPE DECIMAL(7,2);

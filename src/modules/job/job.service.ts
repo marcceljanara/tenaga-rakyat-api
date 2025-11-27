@@ -15,6 +15,7 @@ import {
 } from '../../model/job.model';
 import { JobValidation } from './job.validation';
 import { JobStatus, Prisma } from '@prisma/client';
+import { dec } from '../../utils/decimal';
 
 @Injectable()
 export class JobService {
@@ -344,14 +345,59 @@ export class JobService {
         });
         if (!escrowRecord)
           throw new HttpException('Escrow tidak ditemukan', 400);
+
+        const escrowFee = await this.prismaService.fee.findUnique({
+          where: {
+            name: 'escrow_fee',
+            active: true,
+            fee_type: 'PERCENTAGE',
+          },
+        });
+
+        if (!escrowFee) {
+          throw new HttpException('Escrow fee tidak tersedia', 500);
+        }
+
+        if (escrowFee.fee_type !== 'PERCENTAGE') {
+          throw new HttpException('Escrow fee type mismatch', 500);
+        }
+
+        // make sure the fee value is a valid numeric value
+        const feeNum = Number(escrowFee.value);
+        if (Number.isNaN(feeNum)) {
+          throw new HttpException('Escrow fee value tidak valid', 500);
+        }
+        const fee = escrowRecord.amount.times(dec(feeNum).dividedBy(100));
+        const amount = escrowRecord.amount.minus(fee);
         await tx.wallet.update({
           where: {
             user_id: job.worker_id!,
           },
           data: {
             balance: {
-              increment: escrowRecord.amount,
+              increment: amount,
             },
+          },
+        });
+        const platformWallet = await tx.platformWallet.update({
+          where: {
+            id: 1,
+          },
+          data: {
+            balance: {
+              increment: fee,
+            },
+          },
+        });
+        if (!platformWallet) {
+          throw new HttpException('Error platform wallet!', 500);
+        }
+        await tx.platformTransaction.create({
+          data: {
+            amount: fee,
+            description: `Potongan biaya transaksi escrow sebesar Rp${Number(fee)}`,
+            type: 'ESCROW_FEE',
+            reference_id: escrowRecord.id,
           },
         });
         await tx.transaction.update({
