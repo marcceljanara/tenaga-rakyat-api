@@ -14,7 +14,7 @@ import {
   UpdateEmployerJobStatusRequest,
 } from '../../model/job.model';
 import { JobValidation } from './job.validation';
-import { JobStatus, Prisma } from '@prisma/client';
+import { JobStatus, Prisma, WalletStatus } from '@prisma/client';
 import { dec } from '../../utils/decimal';
 
 @Injectable()
@@ -49,6 +49,23 @@ export class JobService {
       throw new HttpException(
         'Hanya pemberi kerja yang dapat membuat lowongan',
         403,
+      );
+    }
+
+    const wallet = await this.prismaService.wallet.findUnique({
+      where: {
+        user_id: providerId,
+      },
+    });
+
+    if (
+      wallet &&
+      (wallet.status === WalletStatus.SUSPENDED ||
+        wallet.status === WalletStatus.CLOSED)
+    ) {
+      throw new HttpException(
+        `Status dompet anda: ${wallet.status}, silahkan hubungi admin`,
+        400,
       );
     }
 
