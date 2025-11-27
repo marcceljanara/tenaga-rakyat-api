@@ -64,7 +64,7 @@ export class JobService {
         wallet.status === WalletStatus.CLOSED)
     ) {
       throw new HttpException(
-        `Status dompet anda: ${wallet.status}, silahkan hubungi admin`,
+        `Gagal membuat pekerjaan, status dompet anda: ${wallet.status}, silahkan hubungi admin`,
         400,
       );
     }

@@ -17,6 +17,7 @@ import {
   EscrowStatus,
   JobStatus,
   Prisma,
+  WalletStatus,
 } from '@prisma/client';
 
 @Injectable()
@@ -87,6 +88,19 @@ export class ApplicationService {
       throw new HttpException(
         'Hanya pekerja yang dapat melamar pekerjaan',
         403,
+      );
+    }
+
+    const wallet = await this.prismaService.wallet.findUnique({
+      where: {
+        user_id: workerId,
+      },
+    });
+
+    if (wallet && (WalletStatus.CLOSED || WalletStatus.SUSPENDED)) {
+      throw new HttpException(
+        `Gagal melamar pekerjaan, status dompet anda: ${wallet.status}, silahkan hubungi admin`,
+        400,
       );
     }
 
