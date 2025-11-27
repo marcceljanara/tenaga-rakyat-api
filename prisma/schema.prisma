@@ -27,6 +27,11 @@ model User {
   workerEscrow Escrow[] @relation("WorkerEscrow")
   providerEscrow Escrow[] @relation("ProviderEscrow")
   jobApplications JobApplication[]
+  withdrawMethods WithdrawMethod[]
+  withdrawRequests WithdrawRequest[]
+  withdrawLockedByAdmin WithdrawRequest[] @relation("LockedBy")
+  withdrawApprovedByAdmin WithdrawRequest[] @relation("ApprovedBy")
+  withdrawRejectedByAdmin WithdrawRequest[] @relation("RejectedBy")
   profile_picture_url String? @db.VarChar(255)
   about String? @db.Text
   cv_url String? @db.VarChar(512)
@@ -251,4 +256,57 @@ model Fee {
 enum FeeType {
   PERCENTAGE
   FIXED
+}
+
+model WithdrawMethod {
+  id BigInt @id @default(autoincrement())
+  user_id String 
+  user User @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  method WithdrawType
+  withdrawRequests WithdrawRequest[]
+  provider String @db.VarChar(50)
+  account_name String @db.VarChar(100)
+  account_number String @db.VarChar(255)
+  is_active Boolean @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("withdraw_methods")
+}
+
+enum WithdrawType {
+  BANK_TRANSFER
+  EWALLET
+}
+
+model WithdrawRequest {
+  id BigInt @id @default(autoincrement())
+  amount Decimal @db.Decimal(15, 2)
+  user_id String 
+  user User @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  method_id BigInt
+  method WithdrawMethod @relation(fields: [method_id], references: [id], onDelete: Restrict)
+  status WithdrawStatus @default(PENDING)
+  idempotency_key String? @unique
+  admin_locked_by String?
+  lockedByAdmin    User?          @relation("LockedBy", fields: [admin_locked_by], references: [id])
+  admin_approved_by String?
+  approvedByAdmin  User?          @relation("ApprovedBy", fields: [admin_approved_by], references: [id])
+  admin_rejected_by String?
+  rejectedByAdmin  User?          @relation("RejectedBy", fields: [admin_rejected_by], references: [id])
+
+  admin_note String? @db.VarChar(255)
+  transfer_receipt String? // URL bukti transfer
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("withdraw_requests")
+}
+
+enum WithdrawStatus {
+  PENDING
+  PROCESSING    // sedang dikerjakan admin (LOCK)
+  APPROVED
+  REJECTED
+  SENT  // dana sudah benar-benar dikirim
 }
