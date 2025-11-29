@@ -1,3 +1,5 @@
+import { Decimal } from '@prisma/client/runtime/client';
+
 export class AddBalanceWalletInitRequest {
   user_id: string;
   balance: number;
@@ -41,9 +43,9 @@ export class TopupCallbackRequest {
 }
 
 export class WalletResponse {
-  id: number;
+  id: bigint;
   user_id: string;
-  balance: number;
+  balance: Decimal;
   status: string;
 }
 
@@ -52,13 +54,97 @@ export class TransactionListResponse {
 }
 
 export class TransactionResponse {
-  id: number;
-  source_wallet_id: number | null;
-  destination_wallet_id: number | null;
-  job_id: number | null;
-  amount: number;
+  id: bigint;
+  source_wallet_id: bigint | null;
+  destination_wallet_id: bigint | null;
+  job_id: bigint | null;
+  amount: Decimal;
   transaction_type: string | null;
   status: string;
   created_at: Date;
   updated_at: Date;
+}
+
+export class AddWithdrawMethodRequest {
+  method: 'BANK_TRANSFER' | 'EWALLET';
+  provider: string;
+  account_name: string;
+  account_number: string;
+}
+
+export class WithdrawMethodResponse {
+  id: bigint;
+  method: string;
+  provider: string;
+  account_name: string;
+  account_number: string;
+  is_active: boolean;
+}
+
+export class ListWithdrawMethodResponse {
+  withdraw_methods: WithdrawMethodResponse[];
+}
+
+export class CreateWithdrawRequestRequest {
+  amount: number;
+  method_id: number;
+}
+
+export class WithdrawRequestResponse {
+  id: bigint;
+  amount: Decimal;
+  status: string;
+  method: WithdrawMethodResponse;
+  created_at: Date;
+  admin_note?: string | null;
+  transfer_receipt?: string | null;
+  admin_locked_by?: string | null;
+  admin_approved_by?: string | null;
+  admin_rejected_by?: string | null;
+}
+
+export class WithdrawMethodReadyToPay {
+  method: string;
+  provider: string;
+  account_name: string;
+  account_number: string;
+}
+
+export class ListWithdrawRequestResponse {
+  requests: WithdrawRequestDetailResponse[];
+}
+
+export class WithdrawRequestDetailResponse {
+  id: bigint;
+  user_id: string;
+  amount: Decimal;
+  status: string;
+  method: string;
+  provider: string;
+  account_name: string;
+  account_number: string;
+  created_at: Date;
+  admin_locked_by?: string | null;
+  admin_note?: string | null;
+}
+
+export class LockWithdrawRequest {
+  admin_note?: string;
+}
+
+export class ApproveWithdrawRequest {
+  admin_note?: string;
+}
+
+export class RejectWithdrawRequest {
+  admin_note: string;
+}
+
+export class SendWithdrawRequest {
+  transfer_receipt: string;
+}
+
+export class WithdrawRequestQueryParams {
+  status?: 'PENDING' | 'PROCESSING' | 'APPROVED' | 'REJECTED' | 'SENT';
+  user_id?: string;
 }
