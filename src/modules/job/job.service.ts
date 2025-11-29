@@ -15,7 +15,7 @@ import {
 } from '../../model/job.model';
 import { JobValidation } from './job.validation';
 import { JobStatus, Prisma, WalletStatus } from '@prisma/client';
-import { dec } from '../../utils/decimal';
+import { dec } from '../../common/decimal.util';
 
 @Injectable()
 export class JobService {
