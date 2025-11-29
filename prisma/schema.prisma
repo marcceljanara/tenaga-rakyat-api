@@ -287,7 +287,6 @@ model WithdrawRequest {
   method_id BigInt
   method WithdrawMethod @relation(fields: [method_id], references: [id], onDelete: Restrict)
   status WithdrawStatus @default(PENDING)
-  idempotency_key String? @unique
   admin_locked_by String?
   lockedByAdmin    User?          @relation("LockedBy", fields: [admin_locked_by], references: [id])
   admin_approved_by String?
