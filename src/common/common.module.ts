@@ -79,6 +79,8 @@ export class CommonModule implements NestModule {
         '/api/applications/*',
         '/api/wallets',
         '/api/wallets/*',
+        '/api/admin',
+        '/api/admin/*',
       );
   }
 }
