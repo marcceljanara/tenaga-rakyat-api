@@ -93,6 +93,7 @@ export class CreateWithdrawRequestRequest {
 export class WithdrawRequestResponse {
   id: bigint;
   amount: Decimal;
+  fee_charged: Decimal;
   status: string;
   method: WithdrawMethodResponse;
   created_at: Date;
@@ -147,4 +148,17 @@ export class SendWithdrawRequest {
 export class WithdrawRequestQueryParams {
   status?: 'PENDING' | 'PROCESSING' | 'APPROVED' | 'REJECTED' | 'SENT';
   user_id?: string;
+}
+
+export class WithdrawPreviewRequest {
+  amount: number;
+  method_id: number;
+}
+
+export class WithdrawPreviewResponse {
+  amount_requested: Decimal;
+  fee_charged: Decimal;
+  net_amount: Decimal;
+  can_withdraw: boolean;
+  reason: string;
 }

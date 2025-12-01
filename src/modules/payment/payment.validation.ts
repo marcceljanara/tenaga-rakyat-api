@@ -54,4 +54,9 @@ export class PaymentValidation {
       .optional(),
     user_id: z.string().uuid().optional(),
   });
+
+  static readonly WITHDRAW_PREVIEW = z.object({
+    amount: z.coerce.number().min(1),
+    method_id: z.coerce.number().int().min(1),
+  });
 }

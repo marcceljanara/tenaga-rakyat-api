@@ -30,10 +30,14 @@ import {
   WalletResponse,
   WithdrawMethodReadyToPay,
   WithdrawMethodResponse,
+  WithdrawPreviewRequest,
+  WithdrawPreviewResponse,
   WithdrawRequestQueryParams,
   WithdrawRequestResponse,
 } from '../../model/payment.model';
 import { WebResponse } from '../../model/web.model';
+import { PaymentValidation } from './payment.validation';
+import { ZodValidationPipe } from '../../common/zod-validation/zod-validation.pipe';
 
 @Controller('/api')
 export class PaymentController {
@@ -171,6 +175,18 @@ export class PaymentController {
       message: 'Withdraw request created successfully',
       data: result,
     };
+  }
+
+  @Get('wallets/withdraw/preview')
+  @HttpCode(200)
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA])
+  async withdrawPreview(
+    @Auth() user: User,
+    @Query(new ZodValidationPipe(PaymentValidation.WITHDRAW_PREVIEW))
+    query: WithdrawPreviewRequest,
+  ): Promise<WebResponse<WithdrawPreviewResponse>> {
+    const result = await this.paymentService.withdrawPreview(query, user.id);
+    return { data: result };
   }
 
   @Get('/wallets/withdraw-requests')

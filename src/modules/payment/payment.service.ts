@@ -23,6 +23,8 @@ import {
   WalletResponse,
   WithdrawMethodReadyToPay,
   WithdrawMethodResponse,
+  WithdrawPreviewRequest,
+  WithdrawPreviewResponse,
   WithdrawRequestQueryParams,
   WithdrawRequestResponse,
 } from '../../model/payment.model';
@@ -35,6 +37,7 @@ import {
 } from '@prisma/client';
 import { MidtransService } from './midtrans/midtrans.service';
 import { CryptoUtil } from '../../common/crypto.util';
+import { dec } from '../../common/decimal.util';
 
 @Injectable()
 export class PaymentService {
@@ -352,6 +355,15 @@ export class PaymentService {
           },
         });
 
+        // fetch data withdraw fee
+        const fee = await tx.fee.findUnique({
+          where: {
+            name: 'withdraw_fee',
+          },
+        });
+
+        if (!fee) throw new HttpException('Fee tidak ditemukan', 500);
+
         // Create withdraw request
         const newRequest = await tx.withdrawRequest.create({
           data: {
@@ -359,9 +371,34 @@ export class PaymentService {
             method_id: userRequest.method_id,
             amount: userRequest.amount,
             status: WithdrawStatus.PENDING,
+            fee_value: fee.value,
+            fee_type: fee.fee_type,
+            fee_charged: fee.value,
           },
           include: {
             method: true,
+          },
+        });
+
+        // Add fee to platform wallet
+        await tx.platformWallet.update({
+          where: {
+            id: 1,
+          },
+          data: {
+            balance: {
+              increment: fee.value,
+            },
+          },
+        });
+
+        // Add transaction in platform transaction
+        await tx.platformTransaction.create({
+          data: {
+            amount: fee.value,
+            type: 'WITHDRAW_FEE',
+            description: `Fee transaksi penarikan sebesar Rp${Number(fee.value)}`,
+            reference_id: newRequest.id,
           },
         });
 
@@ -372,6 +409,7 @@ export class PaymentService {
     return {
       id: withdrawRequest.id,
       amount: withdrawRequest.amount,
+      fee_charged: withdrawRequest.fee_charged,
       status: withdrawRequest.status,
       created_at: withdrawRequest.created_at,
       method: {
@@ -382,6 +420,71 @@ export class PaymentService {
         account_number: CryptoUtil.decrypt(withdrawMethod.account_number),
         is_active: withdrawMethod.is_active,
       },
+    };
+  }
+
+  async withdrawPreview(
+    request: WithdrawPreviewRequest,
+    userId: string,
+  ): Promise<WithdrawPreviewResponse> {
+    const userRequest = this.validationService.validate(
+      PaymentValidation.WITHDRAW_PREVIEW,
+      request,
+    );
+    const fee = await this.prismaService.fee.findUnique({
+      where: {
+        name: 'withdraw_fee',
+      },
+    });
+
+    if (!fee) throw new HttpException('Fee tidak ditemukan', 500);
+
+    const wallet = await this.prismaService.wallet.findUnique({
+      where: {
+        user_id: userId,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!wallet)
+      throw new HttpException('Wallet tidak ditemukan atau tidak aktif', 404);
+
+    const method = await this.prismaService.withdrawMethod.findUnique({
+      where: {
+        id: userRequest.method_id,
+      },
+    });
+
+    if (!method) {
+      throw new HttpException(
+        'Gagal melakukan estimasi penarikan, metode pembayaran belum ditambahkan',
+        400,
+      );
+    }
+
+    const amountRequested = dec(userRequest.amount);
+
+    if (wallet.balance.lessThan(amountRequested)) {
+      throw new HttpException(
+        'Gagal melakukan estimasi, saldo anda tidak cukup untuk melakukan withdraw',
+        400,
+      );
+    }
+
+    if (amountRequested.lessThan(fee.value)) {
+      throw new HttpException(
+        'Nominal withdraw terlalu kecil untuk dikenai fee',
+        400,
+      );
+    }
+
+    const netAmount = amountRequested.minus(fee.value);
+    return {
+      amount_requested: amountRequested,
+      fee_charged: fee.value,
+      net_amount: netAmount,
+      can_withdraw: true,
+      reason: 'VALID TRANSACTION',
     };
   }
 
@@ -438,6 +541,7 @@ export class PaymentService {
     return {
       id: request.id,
       amount: request.amount,
+      fee_charged: request.fee_charged,
       status: request.status,
       created_at: request.created_at,
       admin_note: request.admin_note,
@@ -645,16 +749,16 @@ export class PaymentService {
       },
     });
 
+    this.logger.info(
+      `Withdraw request ${requestId} approved by admin ${adminId}`,
+    );
+
     return {
       account_name: withdrawRequest.method.account_name,
       account_number: CryptoUtil.decrypt(withdrawRequest.method.account_number),
       method: withdrawRequest.method.method,
       provider: withdrawRequest.method.provider,
     };
-
-    this.logger.info(
-      `Withdraw request ${requestId} approved by admin ${adminId}`,
-    );
   }
 
   async rejectWithdrawRequest(
@@ -707,6 +811,28 @@ export class PaymentService {
           balance: {
             increment: withdrawRequest.amount,
           },
+        },
+      });
+
+      // Decrement balance platfrom wallet from fee
+      await tx.platformWallet.update({
+        where: {
+          id: 1,
+        },
+        data: {
+          balance: {
+            decrement: withdrawRequest.fee_charged,
+          },
+        },
+      });
+
+      // Create new transaction platform wallet
+      await tx.platformTransaction.create({
+        data: {
+          amount: withdrawRequest.fee_charged,
+          type: 'WITHDRAW_FEE',
+          description: `[REFUND] fee sebesar ${Number(withdrawRequest.fee_charged)}`,
+          reference_id: withdrawRequest.id,
         },
       });
 
@@ -794,4 +920,6 @@ export class PaymentService {
 
     this.logger.info(`Withdraw request ${requestId} marked as SENT`);
   }
+
+  // perlu tambah logic untuk fee withdraw
 }
