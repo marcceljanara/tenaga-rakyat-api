@@ -38,8 +38,12 @@ model User {
   verification_status VerificationStatus @default(UNVERIFIED)
   ktp_number_encrypted String? @db.VarChar(255)
   average_rating Decimal? @db.Decimal(2,1)
+  is_deleted Boolean @default(false)
+  is_suspended Boolean @default(false)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+  deleted_at DateTime? @db.Timestamptz()
+  suspended_at DateTime? @db.Timestamptz()
 
   role Role @relation(fields: [role_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
   @@index([role_id])
