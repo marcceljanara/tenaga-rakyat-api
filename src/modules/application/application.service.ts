@@ -84,7 +84,7 @@ export class ApplicationService {
       throw new HttpException('Pekerja tidak ditemukan', 404);
     }
 
-    if (worker.role_id !== BigInt(1)) {
+    if (worker.role_id !== 1) {
       throw new HttpException(
         'Hanya pekerja yang dapat melamar pekerjaan',
         403,
@@ -97,7 +97,14 @@ export class ApplicationService {
       },
     });
 
-    if (wallet && (WalletStatus.CLOSED || WalletStatus.SUSPENDED)) {
+    if (!wallet) {
+      throw new HttpException('Wallet tidak ditemukan', 404);
+    }
+
+    if (
+      WalletStatus.CLOSED == wallet.status ||
+      WalletStatus.SUSPENDED == wallet.status
+    ) {
       throw new HttpException(
         `Gagal melamar pekerjaan, status dompet anda: ${wallet.status}, silahkan hubungi admin`,
         400,

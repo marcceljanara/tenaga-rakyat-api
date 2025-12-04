@@ -486,6 +486,7 @@ describe('ApplicationController', () => {
       workerCookie = workerLogin.headers['set-cookie'];
 
       const providerId = await testService.addProvider();
+      await testService.addBalanceWallet(providerId);
       const providerLogin = await request(app.getHttpServer())
         .post('/api/users/login')
         .send({ email: 'provider@email.com', password: '1234test' });
@@ -596,6 +597,7 @@ describe('ApplicationController', () => {
       workerCookie = workerLogin.headers['set-cookie'];
 
       const providerId = await testService.addProvider();
+      await testService.addBalanceWallet(providerId);
       const providerLogin = await request(app.getHttpServer())
         .post('/api/users/login')
         .send({ email: 'provider@email.com', password: '1234test' });

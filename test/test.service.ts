@@ -23,7 +23,13 @@ export class TestService {
 
     await this.prismaService.refreshToken.deleteMany();
     await this.prismaService.userPhotos.deleteMany();
-    await this.prismaService.user.deleteMany();
+    await this.prismaService.user.deleteMany({
+      where: {
+        NOT: {
+          role_id: 4,
+        },
+      },
+    });
   }
 
   async addUser() {
@@ -38,11 +44,17 @@ export class TestService {
       },
     });
 
+    await this.prismaService.wallet.create({
+      data: {
+        user_id: user.id,
+      },
+    });
+
     return user.id;
   }
 
   async addAnotherUser() {
-    await this.prismaService.user.create({
+    const user = await this.prismaService.user.create({
       data: {
         id: randomUUID(),
         email: 'another@email.com',
@@ -50,6 +62,11 @@ export class TestService {
         password: await bcrypt.hash('1234test', 10),
         phone_number: '085212345671',
         role_id: 1,
+      },
+    });
+    await this.prismaService.wallet.create({
+      data: {
+        user_id: user.id,
       },
     });
   }
@@ -65,6 +82,11 @@ export class TestService {
         role_id: 2, // Provider role
       },
     });
+    await this.prismaService.wallet.create({
+      data: {
+        user_id: user.id,
+      },
+    });
     return user.id;
   }
 
@@ -77,6 +99,11 @@ export class TestService {
         email: 'another@email.com',
         password: hashedPassword,
         role_id: 2, // Provider role
+      },
+    });
+    await this.prismaService.wallet.create({
+      data: {
+        user_id: user.id,
       },
     });
     return user.id;
@@ -131,5 +158,18 @@ export class TestService {
       },
     });
     return job;
+  }
+
+  async addBalanceWallet(userId: string) {
+    await this.prismaService.wallet.update({
+      where: {
+        user_id: userId,
+      },
+      data: {
+        balance: {
+          increment: 50000000,
+        },
+      },
+    });
   }
 }
