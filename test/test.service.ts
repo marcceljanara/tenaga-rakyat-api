@@ -12,11 +12,18 @@ export class TestService {
   }
 
   async deleteAll() {
-    await this.prismaService.user.deleteMany();
+    await this.prismaService.withdrawRequest.deleteMany();
+    await this.prismaService.withdrawMethod.deleteMany();
+
+    await this.prismaService.jobApplication.deleteMany();
+    await this.prismaService.job.deleteMany();
+
+    await this.prismaService.transaction.deleteMany();
+    await this.prismaService.wallet.deleteMany();
+
     await this.prismaService.refreshToken.deleteMany();
     await this.prismaService.userPhotos.deleteMany();
-    await this.prismaService.job.deleteMany();
-    await this.prismaService.jobApplication.deleteMany();
+    await this.prismaService.user.deleteMany();
   }
 
   async addUser() {
@@ -55,7 +62,7 @@ export class TestService {
         phone_number: '+628123456789',
         email: 'provider@email.com',
         password: hashedPassword,
-        role_id: BigInt(2), // Provider role
+        role_id: 2, // Provider role
       },
     });
     return user.id;
@@ -69,7 +76,7 @@ export class TestService {
         phone_number: '+628987654321',
         email: 'another@email.com',
         password: hashedPassword,
-        role_id: BigInt(2), // Provider role
+        role_id: 2, // Provider role
       },
     });
     return user.id;
