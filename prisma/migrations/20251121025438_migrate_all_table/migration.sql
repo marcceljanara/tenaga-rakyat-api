@@ -38,7 +38,7 @@ CREATE TABLE "users" (
 
 -- CreateTable
 CREATE TABLE "user_photos" (
-    "id" BIGSERIAL NOT NULL,
+    "id" SERIAL NOT NULL,
     "user_id" TEXT NOT NULL,
     "photo_url" VARCHAR(512) NOT NULL,
     "description" TEXT NOT NULL,
@@ -69,7 +69,7 @@ CREATE TABLE "refresh_tokens" (
 
 -- CreateTable
 CREATE TABLE "jobs" (
-    "id" BIGSERIAL NOT NULL,
+    "id" SERIAL NOT NULL,
     "provider_id" TEXT NOT NULL,
     "worker_id" TEXT,
     "title" VARCHAR(255) NOT NULL,
@@ -85,8 +85,8 @@ CREATE TABLE "jobs" (
 
 -- CreateTable
 CREATE TABLE "job_applications" (
-    "id" BIGSERIAL NOT NULL,
-    "job_id" BIGINT NOT NULL,
+    "id" SERIAL NOT NULL,
+    "job_id" INT NOT NULL,
     "worker_id" TEXT NOT NULL,
     "cover_letter" TEXT NOT NULL,
     "status" "ApplicationStatus" NOT NULL DEFAULT 'PENDING',
@@ -98,7 +98,7 @@ CREATE TABLE "job_applications" (
 
 -- CreateTable
 CREATE TABLE "wallets" (
-    "id" BIGSERIAL NOT NULL,
+    "id" SERIAL NOT NULL,
     "user_id" TEXT NOT NULL,
     "balance" DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     "status" "WalletStatus" NOT NULL DEFAULT 'ACTIVE',
@@ -110,10 +110,10 @@ CREATE TABLE "wallets" (
 
 -- CreateTable
 CREATE TABLE "transactions" (
-    "id" BIGSERIAL NOT NULL,
-    "source_wallet_id" BIGINT,
-    "destination_wallet_id" BIGINT,
-    "job_id" BIGINT,
+    "id" SERIAL NOT NULL,
+    "source_wallet_id" INT,
+    "destination_wallet_id" INT,
+    "job_id" INT,
     "amount" DECIMAL(12,2) NOT NULL,
     "transaction_type" "TransactionType",
     "status" "TransactonStatus" NOT NULL DEFAULT 'PENDING',

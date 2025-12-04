@@ -3,8 +3,8 @@ CREATE TYPE "EscrowStatus" AS ENUM ('HELD', 'RELEASED', 'REFUNDED');
 
 -- CreateTable
 CREATE TABLE "escrows" (
-    "id" BIGSERIAL NOT NULL,
-    "job_id" BIGINT NOT NULL,
+    "id" SERIAL NOT NULL,
+    "job_id" INT NOT NULL,
     "provider_id" TEXT NOT NULL,
     "worker_id" TEXT NOT NULL,
     "amount" DECIMAL(12,2) NOT NULL,

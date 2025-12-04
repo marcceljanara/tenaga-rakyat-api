@@ -8,6 +8,8 @@ import { ApplicationModule } from './modules/application/application.module';
 import { JobModule } from './modules/job/job.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { CronService } from './infrastructure/cron/cron.service';
+import { UserManagementModule } from './modules/user-management/user-management.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { CronService } from './infrastructure/cron/cron.service';
     ApplicationModule,
     JobModule,
     PaymentModule,
+    UserManagementModule,
+    AdminModule,
   ],
   controllers: [],
   providers: [CronService],

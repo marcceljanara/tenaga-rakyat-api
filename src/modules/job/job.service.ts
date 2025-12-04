@@ -45,7 +45,7 @@ export class JobService {
       throw new HttpException('Provider tidak ditemukan', 404);
     }
 
-    if (provider.role_id !== BigInt(2)) {
+    if (provider.role_id !== 2) {
       throw new HttpException(
         'Hanya pemberi kerja yang dapat membuat lowongan',
         403,

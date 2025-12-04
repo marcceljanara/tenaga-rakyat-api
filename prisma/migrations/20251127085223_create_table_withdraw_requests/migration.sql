@@ -7,10 +7,10 @@ ALTER COLUMN "account_number" SET DATA TYPE VARCHAR(255);
 
 -- CreateTable
 CREATE TABLE "withdraw_requests" (
-    "id" BIGSERIAL NOT NULL,
+    "id" SERIAL NOT NULL,
     "amount" DECIMAL(15,2) NOT NULL,
     "user_id" TEXT NOT NULL,
-    "method_id" BIGINT NOT NULL,
+    "method_id" INT NOT NULL,
     "status" "WithdrawStatus" NOT NULL DEFAULT 'PENDING',
     "idempotency_key" TEXT,
     "admin_locked_by" TEXT,

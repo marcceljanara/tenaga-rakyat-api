@@ -3,7 +3,7 @@ CREATE TYPE "PlatformTransactionType" AS ENUM ('ESCROW_FEE', 'WITHDRAW_FEE', 'SE
 
 -- CreateTable
 CREATE TABLE "platform_wallet" (
-    "id" BIGSERIAL NOT NULL,
+    "id" SERIAL NOT NULL,
     "balance" DECIMAL(15,2) NOT NULL DEFAULT 0,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -13,10 +13,10 @@ CREATE TABLE "platform_wallet" (
 
 -- CreateTable
 CREATE TABLE "platform_transactions" (
-    "id" BIGSERIAL NOT NULL,
+    "id" SERIAL NOT NULL,
     "amount" DECIMAL(15,2) NOT NULL,
     "type" "PlatformTransactionType" NOT NULL,
-    "reference_id" BIGINT,
+    "reference_id" INT,
     "description" VARCHAR(255) NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

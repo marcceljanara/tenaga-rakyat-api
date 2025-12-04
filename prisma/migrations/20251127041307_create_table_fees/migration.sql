@@ -3,7 +3,7 @@ CREATE TYPE "FeeType" AS ENUM ('PERCENTAGE', 'FIXED');
 
 -- CreateTable
 CREATE TABLE "fees" (
-    "id" BIGSERIAL NOT NULL,
+    "id" SERIAL NOT NULL,
     "value" DECIMAL(5,2) NOT NULL,
     "fee_type" "FeeType" NOT NULL,
     "active" BOOLEAN NOT NULL DEFAULT true,

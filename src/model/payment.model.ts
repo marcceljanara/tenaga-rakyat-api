@@ -43,7 +43,7 @@ export class TopupCallbackRequest {
 }
 
 export class WalletResponse {
-  id: bigint;
+  id: number;
   user_id: string;
   balance: Decimal;
   status: string;
@@ -54,10 +54,10 @@ export class TransactionListResponse {
 }
 
 export class TransactionResponse {
-  id: bigint;
-  source_wallet_id: bigint | null;
-  destination_wallet_id: bigint | null;
-  job_id: bigint | null;
+  id: number;
+  source_wallet_id: number | null;
+  destination_wallet_id: number | null;
+  job_id: number | null;
   amount: Decimal;
   transaction_type: string | null;
   status: string;
@@ -73,7 +73,7 @@ export class AddWithdrawMethodRequest {
 }
 
 export class WithdrawMethodResponse {
-  id: bigint;
+  id: number;
   method: string;
   provider: string;
   account_name: string;
@@ -91,7 +91,7 @@ export class CreateWithdrawRequestRequest {
 }
 
 export class WithdrawRequestResponse {
-  id: bigint;
+  id: number;
   amount: Decimal;
   fee_charged: Decimal;
   status: string;
@@ -116,7 +116,7 @@ export class ListWithdrawRequestResponse {
 }
 
 export class WithdrawRequestDetailResponse {
-  id: bigint;
+  id: number;
   user_id: string;
   amount: Decimal;
   status: string;

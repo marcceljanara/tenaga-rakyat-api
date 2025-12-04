@@ -3,7 +3,7 @@ CREATE TYPE "WithdrawType" AS ENUM ('BANK_TRANSFER', 'EWALLET');
 
 -- CreateTable
 CREATE TABLE "withdraw_methods" (
-    "id" BIGSERIAL NOT NULL,
+    "id" SERIAL NOT NULL,
     "user_id" TEXT NOT NULL,
     "method" "WithdrawType" NOT NULL,
     "provider" VARCHAR(50) NOT NULL,
