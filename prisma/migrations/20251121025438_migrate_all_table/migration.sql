@@ -23,7 +23,7 @@ CREATE TABLE "users" (
     "phone_number" VARCHAR(20) NOT NULL,
     "email" VARCHAR(255) NOT NULL,
     "password" VARCHAR(255) NOT NULL,
-    "role_id" BIGINT NOT NULL,
+    "role_id" INT NOT NULL,
     "profile_picture_url" VARCHAR(255),
     "about" TEXT,
     "cv_url" VARCHAR(512),
@@ -50,7 +50,7 @@ CREATE TABLE "user_photos" (
 
 -- CreateTable
 CREATE TABLE "roles" (
-    "id" BIGSERIAL NOT NULL,
+    "id" SERIAL NOT NULL,
     "name" VARCHAR(50) NOT NULL,
 
     CONSTRAINT "roles_pkey" PRIMARY KEY ("id")
