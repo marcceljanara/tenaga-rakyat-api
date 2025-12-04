@@ -35,4 +35,14 @@ export class CryptoUtil {
 
     return decrypted.toString('utf8');
   }
+
+  static hash8(userId: string): string {
+    const hash8 = crypto
+      .createHash('md5')
+      .update(userId) // UUID v4 here
+      .digest('hex')
+      .slice(0, 8);
+
+    return hash8;
+  }
 }

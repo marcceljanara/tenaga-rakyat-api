@@ -13,6 +13,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { ROLES } from '../../common/role/role';
 import { AdminValidation } from './admin.validation';
+import { CryptoUtil } from '../../common/crypto.util';
 
 @Injectable()
 export class AdminService {
@@ -267,6 +268,15 @@ export class AdminService {
       where: { id: adminId },
       data: {
         is_deleted: true,
+        about: null,
+        average_rating: null,
+        cv_url: null,
+        ktp_number_encrypted: null,
+        profile_picture_url: null,
+        email: `deleted_${admin.id}_${Date.now()}_@mail.com`,
+        phone_number: `del_${CryptoUtil.hash8(admin.id)}`,
+        full_name: `deleted_${admin.id}_${Date.now()}`,
+        deleted_at: new Date(),
       },
     });
   }
