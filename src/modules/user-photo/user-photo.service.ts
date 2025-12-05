@@ -133,7 +133,7 @@ export class UserPhotoService {
 
   async getPhotoById(
     userId: string,
-    photoId: bigint,
+    photoId: number,
   ): Promise<UserPhotoResponse> {
     this.logger.debug(`Getting photo ${photoId} for user ${userId}`);
 
@@ -153,7 +153,7 @@ export class UserPhotoService {
 
   async editPhotoDescription(
     userId: string,
-    photoId: bigint,
+    photoId: number,
     request: EditUserPhotoRequest,
   ): Promise<UserPhotoResponse> {
     this.logger.debug(
@@ -189,7 +189,7 @@ export class UserPhotoService {
     return this.toUserPhotoResponse(photo);
   }
 
-  async deletePhoto(userId: string, photoId: bigint): Promise<void> {
+  async deletePhoto(userId: string, photoId: number): Promise<void> {
     this.logger.debug(`Deleting photo ${photoId} for user ${userId}`);
 
     // Verify photo exists and belongs to user

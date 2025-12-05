@@ -63,10 +63,7 @@ export class UserPhotoController {
     @Auth() user: User,
     @Param('photoId', ParseIntPipe) photoId: number,
   ): Promise<WebResponse<UserPhotoResponse>> {
-    const result = await this.userPhotoService.getPhotoById(
-      user.id,
-      BigInt(photoId),
-    );
+    const result = await this.userPhotoService.getPhotoById(user.id, photoId);
     return {
       data: result,
     };
@@ -82,7 +79,7 @@ export class UserPhotoController {
   ): Promise<WebResponse<UserPhotoResponse>> {
     const result = await this.userPhotoService.editPhotoDescription(
       user.id,
-      BigInt(photoId),
+      photoId,
       request,
     );
     return {
@@ -98,7 +95,7 @@ export class UserPhotoController {
     @Auth() user: User,
     @Param('photoId', ParseIntPipe) photoId: number,
   ): Promise<WebResponse<void>> {
-    await this.userPhotoService.deletePhoto(user.id, BigInt(photoId));
+    await this.userPhotoService.deletePhoto(user.id, photoId);
     return {
       message: 'Photo deleted successfully',
     };

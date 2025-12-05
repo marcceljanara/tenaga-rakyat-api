@@ -83,6 +83,8 @@ export class CommonModule implements NestModule {
         '/api/admin/*',
         '/api/admins',
         '/api/admins/*',
+        '/api/user-management',
+        '/api/user-management/*',
       );
   }
 }
