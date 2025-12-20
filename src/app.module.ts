@@ -10,6 +10,7 @@ import { PaymentModule } from './modules/payment/payment.module';
 import { CronService } from './infrastructure/cron/cron.service';
 import { UserManagementModule } from './modules/user-management/user-management.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { ReportModule } from './modules/report/report.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AdminModule } from './modules/admin/admin.module';
     PaymentModule,
     UserManagementModule,
     AdminModule,
+    ReportModule,
   ],
   controllers: [],
   providers: [CronService],
