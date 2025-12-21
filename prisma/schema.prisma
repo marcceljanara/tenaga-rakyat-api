@@ -29,6 +29,7 @@ model User {
   jobApplications JobApplication[]
   withdrawMethods WithdrawMethod[]
   withdrawRequests WithdrawRequest[]
+  emailVerifications EmailVerification[]
   withdrawLockedByAdmin WithdrawRequest[] @relation("LockedBy")
   withdrawApprovedByAdmin WithdrawRequest[] @relation("ApprovedBy")
   withdrawRejectedByAdmin WithdrawRequest[] @relation("RejectedBy")
@@ -51,6 +52,35 @@ model User {
 
 }
 
+enum VerificationType {
+  EMAIL
+}
+
+enum VerificationPurpose {
+  REGISTER
+  CHANGE_EMAIL
+  LOGIN
+}
+
+model EmailVerification {
+  id String @id @default(uuid())
+  user_id String
+  email String @db.VarChar(255)
+  token_hash String @db.VarChar(255)
+  purpose VerificationPurpose
+  expires_at DateTime
+  verified_at DateTime?
+  is_revoked Boolean @default(false)
+  created_at DateTime @default(now())
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([email])
+  @@index([token_hash])
+  @@map("email_verifications")
+}
+
+
 model UserPhotos {
   id Int @id @default(autoincrement())
   user_id String
@@ -67,9 +97,8 @@ model UserPhotos {
 
 enum VerificationStatus {
   UNVERIFIED
-  PENDING
-  VERIFIED
-  REJECTED
+  EMAIL_VERIFIED
+  FULL_VERIFIED
 }
 
 model Role {

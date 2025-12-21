@@ -68,7 +68,7 @@ async function main() {
       full_name: 'SUPER ADMIN',
       phone_number: '080000000000',
       role_id: ROLES.SUPER_ADMIN,
-      verification_status: 'VERIFIED',
+      verification_status: 'FULL_VERIFIED',
     },
   });
 }
