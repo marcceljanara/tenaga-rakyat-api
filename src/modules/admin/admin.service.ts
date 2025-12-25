@@ -68,7 +68,7 @@ export class AdminService {
         email: adminRequest.email,
         password: hashedPassword,
         role_id: adminRole.id,
-        verification_status: 'VERIFIED',
+        verification_status: 'EMAIL_VERIFIED',
       },
       include: {
         role: true,
