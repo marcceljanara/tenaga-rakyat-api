@@ -59,7 +59,7 @@ enum VerificationType {
 enum VerificationPurpose {
   REGISTER
   CHANGE_EMAIL
-  LOGIN
+  RESET_PASSWORD
 }
 
 model EmailVerification {

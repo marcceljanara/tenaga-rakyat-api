@@ -232,27 +232,27 @@ export class EmailVerificationService {
           `,
         };
 
-      case VerificationPurpose.LOGIN:
-        return {
-          subject: `Verifikasi Login - ${appName}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2>Verifikasi Login Anda</h2>
-              <p>Kami mendeteksi upaya login ke akun Anda. Silakan verifikasi dengan mengklik tombol di bawah ini:</p>
-              <div style="margin: 30px 0;">
-                <a href="${verificationLink}" 
-                   style="background-color: #FF9800; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; display: inline-block;">
-                  Verifikasi Login
-                </a>
-              </div>
-              <p>Atau salin dan tempel link berikut ke browser Anda:</p>
-              <p style="word-break: break-all; color: #666;">${verificationLink}</p>
-              <p style="color: #999; font-size: 12px; margin-top: 30px;">
-                Link ini akan kedaluwarsa dalam ${this.TOKEN_EXPIRY_HOURS} jam. Jika Anda tidak mencoba login, abaikan email ini.
-              </p>
-            </div>
-          `,
-        };
+      // case VerificationPurpose.LOGIN:
+      //   return {
+      //     subject: `Verifikasi Login - ${appName}`,
+      //     html: `
+      //       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      //         <h2>Verifikasi Login Anda</h2>
+      //         <p>Kami mendeteksi upaya login ke akun Anda. Silakan verifikasi dengan mengklik tombol di bawah ini:</p>
+      //         <div style="margin: 30px 0;">
+      //           <a href="${verificationLink}"
+      //              style="background-color: #FF9800; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; display: inline-block;">
+      //             Verifikasi Login
+      //           </a>
+      //         </div>
+      //         <p>Atau salin dan tempel link berikut ke browser Anda:</p>
+      //         <p style="word-break: break-all; color: #666;">${verificationLink}</p>
+      //         <p style="color: #999; font-size: 12px; margin-top: 30px;">
+      //           Link ini akan kedaluwarsa dalam ${this.TOKEN_EXPIRY_HOURS} jam. Jika Anda tidak mencoba login, abaikan email ini.
+      //         </p>
+      //       </div>
+      //     `,
+      //   };
 
       default:
         throw new HttpException('Tujuan verifikasi tidak valid', 400);
