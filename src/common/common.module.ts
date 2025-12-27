@@ -16,6 +16,7 @@ import { AuthMiddleware } from './auth/auth.middleware';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
 import { RoleGuard } from './role/role.guard';
+import { BullModule } from '@nestjs/bull';
 
 @Global()
 @Module({
@@ -27,6 +28,16 @@ import { RoleGuard } from './role/role.guard';
     }),
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    
+    // Bull Queue Configuration
+    BullModule.forRoot({
+      redis: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+        password: process.env.REDIS_PASSWORD,
+        maxRetriesPerRequest: null,
+      },
     }),
     JwtModule.register({
       secret: process.env.JWT_SECRET,
