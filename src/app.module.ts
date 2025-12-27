@@ -11,6 +11,7 @@ import { CronService } from './infrastructure/cron/cron.service';
 import { UserManagementModule } from './modules/user-management/user-management.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { ReportModule } from './modules/report/report.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ReportModule } from './modules/report/report.module';
     UserManagementModule,
     AdminModule,
     ReportModule,
+    AuthModule,
   ],
   controllers: [],
   providers: [CronService],

@@ -8,7 +8,7 @@ export class UserListQueryRequest {
 }
 
 export class UpdateUserVerificationRequest {
-  verification_status: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
+  verification_status: 'UNVERIFIED' | 'EMAIL_VERIFIED' | 'FULL_VERIFIED';
 }
 
 export class SuspendUserWalletRequest {
@@ -58,10 +58,9 @@ export class UserListResponse {
 
 export class UserStatsResponse {
   total_users: number;
-  verified_users: number;
+  email_verified_users: number;
   unverified_users: number;
-  pending_verification: number;
-  rejected_verification: number;
+  full_verified_users: number;
   workers: number;
   job_providers: number;
 }

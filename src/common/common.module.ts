@@ -85,6 +85,8 @@ export class CommonModule implements NestModule {
         '/api/admins/*',
         '/api/user-management',
         '/api/user-management/*',
+        '/api/auth/resend-verification',
+        '/api/auth/change-email',
       );
   }
 }

@@ -371,10 +371,9 @@ export class UserManagementService {
 
     const [
       totalUsers,
-      verifiedUsers,
+      emailVerifiedUsers,
       unverifiedUsers,
-      pendingVerification,
-      rejectedVerification,
+      fullVerifiedUsers,
       workers,
       jobProviders,
     ] = await Promise.all([
@@ -384,7 +383,7 @@ export class UserManagementService {
       this.prismaService.user.count({
         where: {
           role_id: { notIn: excludeRoleIds },
-          verification_status: 'VERIFIED',
+          verification_status: 'EMAIL_VERIFIED',
         },
       }),
       this.prismaService.user.count({
@@ -396,13 +395,7 @@ export class UserManagementService {
       this.prismaService.user.count({
         where: {
           role_id: { notIn: excludeRoleIds },
-          verification_status: 'PENDING',
-        },
-      }),
-      this.prismaService.user.count({
-        where: {
-          role_id: { notIn: excludeRoleIds },
-          verification_status: 'REJECTED',
+          verification_status: 'FULL_VERIFIED',
         },
       }),
       this.prismaService.user.count({
@@ -415,10 +408,9 @@ export class UserManagementService {
 
     return {
       total_users: totalUsers,
-      verified_users: verifiedUsers,
+      email_verified_users: emailVerifiedUsers,
       unverified_users: unverifiedUsers,
-      pending_verification: pendingVerification,
-      rejected_verification: rejectedVerification,
+      full_verified_users: fullVerifiedUsers,
       workers,
       job_providers: jobProviders,
     };

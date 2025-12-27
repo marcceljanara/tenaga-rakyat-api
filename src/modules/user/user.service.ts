@@ -15,7 +15,8 @@ import { UserValidation } from './user.validation';
 import { JwtService } from '@nestjs/jwt';
 import { addDays } from 'date-fns';
 import { randomUUID } from 'crypto';
-import { Prisma } from '@prisma/client';
+import { Prisma, VerificationPurpose } from '@prisma/client';
+import { EmailVerificationService } from '../auth/email-verification.service';
 
 @Injectable()
 export class UserService {
@@ -24,6 +25,7 @@ export class UserService {
     @Inject(WINSTON_MODULE_PROVIDER) private logger: Logger,
     private prismaService: PrismaService,
     private jwt: JwtService,
+    private emailVerificationService: EmailVerificationService,
   ) {}
 
   async register(request: RegisterUserRequest): Promise<UserResponse> {
@@ -67,8 +69,21 @@ export class UserService {
       return {
         id: user.id,
         full_name: user.full_name,
+        email: user.email,
       };
     });
+    // Send verification email asynchronously
+    try {
+      await this.emailVerificationService.sendVerificationEmail(
+        result.id,
+        result.email,
+        VerificationPurpose.REGISTER,
+      );
+      this.logger.info(`Verification email sent to ${result.email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send verification email: ${error.message}`);
+      // Don't fail registration if email fails, user can resend later
+    }
     return result;
   }
 
