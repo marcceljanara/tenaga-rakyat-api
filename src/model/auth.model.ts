@@ -4,6 +4,12 @@ export class VerifyEmailRequest {
   token: string;
 }
 
+export class VerifyAndResetPasswordRequest {
+  token: string;
+  newPassword: string;
+  confirmNewPassword: string;
+}
+
 export class VerifyEmailResponse {
   success: boolean;
   message: string;
@@ -21,4 +27,12 @@ export class ResendVerificationResponse {
 export class SendVerificationEmailRequest {
   email: string;
   purpose: VerificationPurpose;
+}
+
+export class SendEmailForgotPasswordRequest {
+  email: string;
+}
+
+export class ChangeEmailRequest {
+  newEmail: string;
 }

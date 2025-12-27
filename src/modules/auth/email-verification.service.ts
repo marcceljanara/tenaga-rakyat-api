@@ -8,7 +8,11 @@ import { VerificationPurpose } from '@prisma/client';
 import {
   VerifyEmailRequest,
   ResendVerificationRequest,
+  VerifyAndResetPasswordRequest,
+  SendVerificationEmailRequest,
+  SendEmailForgotPasswordRequest,
 } from '../../model/auth.model';
+import bcrypt from 'bcrypt';
 
 @Injectable()
 export class EmailVerificationService {
@@ -21,6 +25,9 @@ export class EmailVerificationService {
     private validationService: ValidationService,
   ) {}
 
+  /**
+   * Send verification email when userId is known (register, resend)
+   */
   async sendVerificationEmail(
     userId: string,
     email: string,
@@ -37,7 +44,6 @@ export class EmailVerificationService {
     await this.prismaService.emailVerification.updateMany({
       where: {
         user_id: userId,
-        email: email,
         purpose: purpose,
         verified_at: null,
         is_revoked: false,
@@ -59,7 +65,7 @@ export class EmailVerificationService {
     });
 
     // Generate verification link
-    const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+    const verificationLink = this.getVerificationLink(purpose, token);
 
     // Prepare email content based on purpose
     const { subject, html } = this.getEmailContent(purpose, verificationLink);
@@ -76,6 +82,137 @@ export class EmailVerificationService {
     );
   }
 
+  /**
+   * Send verification email by email only (reset password, change email request)
+   * This finds the user first, then sends the email
+   */
+  async sendVerificationEmailByEmail(
+    request: SendEmailForgotPasswordRequest,
+    purpose: VerificationPurpose = VerificationPurpose.RESET_PASSWORD,
+  ): Promise<void> {
+    // Validate request
+    const validatedRequest: SendVerificationEmailRequest =
+      this.validationService.validate(
+        AuthValidation.SEND_EMAIL_FORGOT_PASSWORD,
+        request,
+      ) as SendVerificationEmailRequest;
+
+    // Find user by email
+    const user = await this.prismaService.user.findUnique({
+      where: { email: validatedRequest.email },
+    });
+
+    if (!user) {
+      // For security: don't reveal if email exists or not
+      // Log but don't throw error
+      this.logger.warn(
+        `Verification email requested for non-existent email: ${validatedRequest.email}`,
+      );
+      // Return silently to prevent email enumeration attacks
+      return;
+    }
+
+    // Check if user is deleted or suspended
+    if (user.is_deleted || user.is_suspended) {
+      this.logger.warn(
+        `Verification email requested for deleted/suspended user: ${validatedRequest.email}`,
+      );
+      return;
+    }
+
+    // Send verification email using the found userId
+    await this.sendVerificationEmail(user.id, validatedRequest.email, purpose);
+  }
+
+  /**
+   * Request change email - authenticated user wants to change their email
+   */
+  async requestChangeEmail(userId: string, newEmail: string): Promise<void> {
+    // Check if new email already exists
+    const existingUser = await this.prismaService.user.findUnique({
+      where: { email: newEmail },
+    });
+
+    if (existingUser) {
+      throw new HttpException('Email sudah digunakan', 400);
+    }
+
+    // Send verification to NEW email with user's current userId
+    await this.sendVerificationEmail(
+      userId,
+      newEmail,
+      VerificationPurpose.CHANGE_EMAIL,
+    );
+  }
+
+  /**
+   * Verify and reset password
+   */
+  async verifyAndResetPassword(
+    request: VerifyAndResetPasswordRequest,
+  ): Promise<void> {
+    const validatedRequest: VerifyAndResetPasswordRequest =
+      this.validationService.validate(
+        AuthValidation.VERIFY_AND_RESET_PASSWORD,
+        request,
+      ) as VerifyAndResetPasswordRequest;
+
+    if (validatedRequest.newPassword !== validatedRequest.confirmNewPassword) {
+      throw new HttpException('Password baru dan konfirmasi tidak cocok', 400);
+    }
+
+    // Hash the provided token
+    const tokenHash = TokenUtil.hashToken(validatedRequest.token);
+
+    // Find verification record
+    const verification = await this.prismaService.emailVerification.findFirst({
+      where: {
+        token_hash: tokenHash,
+        purpose: VerificationPurpose.RESET_PASSWORD,
+        verified_at: null,
+        is_revoked: false,
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    if (!verification) {
+      throw new HttpException(
+        'Token verifikasi tidak valid atau sudah kedaluwarsa',
+        400,
+      );
+    }
+
+    // Check if token is expired
+    if (new Date() > verification.expires_at) {
+      throw new HttpException('Token verifikasi sudah kedaluwarsa', 400);
+    }
+
+    const passwordHash = await bcrypt.hash(validatedRequest.newPassword, 10);
+
+    await this.prismaService.$transaction(async (tx) => {
+      // Mark verification as verified
+      await tx.emailVerification.update({
+        where: { id: verification.id },
+        data: { verified_at: new Date() },
+      });
+
+      // Update password
+      await tx.user.update({
+        where: { id: verification.user_id },
+        data: { password: passwordHash },
+      });
+    });
+
+    this.logger.log(
+      `Password reset successfully for user: ${verification.user_id}`,
+    );
+  }
+
+  /**
+   * Verify email for registration or email change
+   */
   async verifyEmail(token: string): Promise<{
     success: boolean;
     message: string;
@@ -129,6 +266,7 @@ export class EmailVerificationService {
           data: { verification_status: 'EMAIL_VERIFIED' },
         });
       } else if (verification.purpose === VerificationPurpose.CHANGE_EMAIL) {
+        // Update to new email and mark as verified
         await tx.user.update({
           where: { id: verification.user_id },
           data: {
@@ -140,7 +278,7 @@ export class EmailVerificationService {
     });
 
     this.logger.log(
-      `Email verified successfully for user: ${verification.user_id}`,
+      `Email verified successfully for user: ${verification.user_id}, purpose: ${verification.purpose}`,
     );
 
     return {
@@ -150,6 +288,9 @@ export class EmailVerificationService {
     };
   }
 
+  /**
+   * Resend verification email (authenticated user)
+   */
   async resendVerificationEmail(
     userId: string,
     purpose: VerificationPurpose,
@@ -169,7 +310,7 @@ export class EmailVerificationService {
       throw new HttpException('User tidak ditemukan', 404);
     }
 
-    // Check if already verified
+    // Check if already verified (only for REGISTER purpose)
     if (
       request.purpose === VerificationPurpose.REGISTER &&
       user.verification_status !== 'UNVERIFIED'
@@ -177,10 +318,64 @@ export class EmailVerificationService {
       throw new HttpException('Email sudah diverifikasi', 400);
     }
 
-    // Send new verification email
+    // For CHANGE_EMAIL, get the pending new email from latest unverified token
+    if (request.purpose === VerificationPurpose.CHANGE_EMAIL) {
+      const latestChangeRequest =
+        await this.prismaService.emailVerification.findFirst({
+          where: {
+            user_id: userId,
+            purpose: VerificationPurpose.CHANGE_EMAIL,
+            verified_at: null,
+            is_revoked: false,
+          },
+          orderBy: {
+            created_at: 'desc',
+          },
+        });
+
+      if (!latestChangeRequest) {
+        throw new HttpException(
+          'Tidak ada permintaan perubahan email yang pending',
+          400,
+        );
+      }
+
+      // Resend to the new email that was requested
+      await this.sendVerificationEmail(
+        userId,
+        latestChangeRequest.email,
+        request.purpose,
+      );
+      return;
+    }
+
+    // For other purposes, send to current email
     await this.sendVerificationEmail(userId, user.email, request.purpose);
   }
 
+  /**
+   * Generate verification link based on purpose
+   */
+  private getVerificationLink(
+    purpose: VerificationPurpose,
+    token: string,
+  ): string {
+    const baseUrl = process.env.FRONTEND_URL;
+
+    switch (purpose) {
+      case VerificationPurpose.REGISTER:
+      case VerificationPurpose.CHANGE_EMAIL:
+        return `${baseUrl}/verify-email?token=${token}`;
+      case VerificationPurpose.RESET_PASSWORD:
+        return `${baseUrl}/reset-password?token=${token}`;
+      default:
+        return `${baseUrl}/verify?token=${token}`;
+    }
+  }
+
+  /**
+   * Get email content based on purpose
+   */
   private getEmailContent(
     purpose: VerificationPurpose,
     verificationLink: string,
@@ -232,27 +427,30 @@ export class EmailVerificationService {
           `,
         };
 
-      // case VerificationPurpose.LOGIN:
-      //   return {
-      //     subject: `Verifikasi Login - ${appName}`,
-      //     html: `
-      //       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      //         <h2>Verifikasi Login Anda</h2>
-      //         <p>Kami mendeteksi upaya login ke akun Anda. Silakan verifikasi dengan mengklik tombol di bawah ini:</p>
-      //         <div style="margin: 30px 0;">
-      //           <a href="${verificationLink}"
-      //              style="background-color: #FF9800; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; display: inline-block;">
-      //             Verifikasi Login
-      //           </a>
-      //         </div>
-      //         <p>Atau salin dan tempel link berikut ke browser Anda:</p>
-      //         <p style="word-break: break-all; color: #666;">${verificationLink}</p>
-      //         <p style="color: #999; font-size: 12px; margin-top: 30px;">
-      //           Link ini akan kedaluwarsa dalam ${this.TOKEN_EXPIRY_HOURS} jam. Jika Anda tidak mencoba login, abaikan email ini.
-      //         </p>
-      //       </div>
-      //     `,
-      //   };
+      case VerificationPurpose.RESET_PASSWORD:
+        return {
+          subject: `Reset Password Akun Anda - ${appName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2>Permintaan Reset Password</h2>
+              <p>Kami menerima permintaan untuk <strong>mengatur ulang password</strong> akun Anda.</p>
+              <p>Jika benar Anda yang melakukan permintaan ini, silakan klik tombol di bawah untuk melanjutkan proses reset password:</p>
+              <div style="margin: 30px 0;">
+                <a href="${verificationLink}"
+                   style="background-color: #E53935; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                  Reset Password
+                </a>
+              </div>
+              <p>Atau salin dan tempel link berikut ke browser Anda:</p>
+              <p style="word-break: break-all; color: #666;">${verificationLink}</p>
+              <p style="color: #999; font-size: 12px; margin-top: 30px;">
+                Link ini hanya berlaku selama ${this.TOKEN_EXPIRY_HOURS} jam.
+                Jika Anda <strong>tidak pernah meminta reset password</strong>,
+                silakan abaikan email ini — akun Anda tetap aman.
+              </p>
+            </div>
+          `,
+        };
 
       default:
         throw new HttpException('Tujuan verifikasi tidak valid', 400);
