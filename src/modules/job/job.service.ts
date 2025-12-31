@@ -87,6 +87,7 @@ export class JobService {
             full_name: true,
             profile_picture_url: true,
             average_rating: true,
+            phone_number: true,
           },
         },
         _count: {
@@ -733,6 +734,7 @@ export class JobService {
             average_rating: job.provider.average_rating
               ? Number(job.provider.average_rating)
               : null,
+            phone_number: job.provider.phone_number,
           }
         : undefined,
       worker: job.worker

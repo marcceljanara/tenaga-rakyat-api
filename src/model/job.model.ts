@@ -36,6 +36,7 @@ export class JobResponse {
     full_name: string;
     profile_picture_url: string | null;
     average_rating: number | null;
+    phone_number: string | null;
   };
   worker?: {
     id: string;
