@@ -1,10 +1,14 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Decimal } from '@prisma/client/runtime/client';
 
 export class ReportDashboardSummaryResponse {
+  @ApiProperty()
   period: {
     from: Date;
     to: Date;
   };
+
+  @ApiProperty()
   summary: {
     total_inflow: Decimal;
     total_outflow: Decimal;
@@ -16,6 +20,9 @@ export class ReportDashboardSummaryResponse {
 }
 
 export class ReportDateRangeRequest {
+  @ApiProperty()
   from: Date;
+
+  @ApiProperty()
   to: Date;
 }

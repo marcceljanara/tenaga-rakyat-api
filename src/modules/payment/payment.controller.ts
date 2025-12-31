@@ -38,7 +38,9 @@ import {
 import { WebResponse } from '../../model/web.model';
 import { PaymentValidation } from './payment.validation';
 import { ZodValidationPipe } from '../../common/zod-validation/zod-validation.pipe';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 
+@ApiTags('Payment & Wallet')
 @Controller('/api')
 export class PaymentController {
   constructor(private paymentService: PaymentService) {}
@@ -46,6 +48,21 @@ export class PaymentController {
   @Post('/admin/wallets/balance-initial')
   @HttpCode(200)
   @Roles([ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiTags('Admin - Wallet Management')
+  @ApiOperation({ summary: 'Add initial balance', description: 'Add initial balance to user wallet (Super Admin only). Creates FUNDING transaction.' })
+  @ApiBody({ type: AddBalanceWalletInitRequest })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Balance added successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Saldo wallet berhasil ditambahan' }
+      }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Wallet not found' })
   async addBalanceInitial(
     @Auth() user: User,
     @Body() request: AddBalanceWalletInitRequest,
@@ -59,6 +76,27 @@ export class PaymentController {
   @Post('/wallets/topup')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA])
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Top up wallet', description: 'Create top-up transaction via Midtrans (minimum: 10,000)' })
+  @ApiBody({ type: TopupWalletRequest })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Payment link created. Returns Midtrans snap token and redirect URL.',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Silahkan selesaikan pembayaran' },
+        data: {
+          type: 'object',
+          properties: {
+            token: { type: 'string', example: 'snap-token-here' },
+            redirect_url: { type: 'string', example: 'https://app.midtrans.com/snap/v2/...' }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Wallet not found' })
   async topupWallet(
     @Auth() user: User,
     @Body() request: TopupWalletRequest,
@@ -76,6 +114,19 @@ export class PaymentController {
 
   @Post('/webhook/midtrans')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Midtrans webhook', description: 'Handle Midtrans payment callback (Midtrans only)' })
+  @ApiBody({ type: TopupCallbackRequest })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Callback processed',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'OK' }
+      }
+    }
+  })
+  @ApiResponse({ status: 401, description: 'Invalid signature' })
   async midtransCallback(@Body() body: TopupCallbackRequest) {
     console.log('Midtrans callback received:', body);
     await this.paymentService.handleCallback(body);
@@ -85,6 +136,19 @@ export class PaymentController {
   @Get('/wallets')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get wallet', description: 'Get wallet information for logged-in user' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Wallet data retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/WalletResponse' }
+      }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Wallet not found' })
   async getWallet(@Auth() user: User): Promise<WebResponse<WalletResponse>> {
     const result = await this.paymentService.getWallet(user.id);
     return {
@@ -95,6 +159,20 @@ export class PaymentController {
   @Get('/wallets/transactions/:walletId')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get wallet transactions', description: 'Get transaction history for specific wallet (must be owner)' })
+  @ApiParam({ name: 'walletId', type: Number, description: 'Wallet ID' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Transaction list retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/TransactionListResponse' }
+      }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Wallet not found or not owned by user' })
   async getWalletTransaction(
     @Auth() user: User,
     @Param('walletId', ParseIntPipe) walletId: number,
@@ -115,6 +193,21 @@ export class PaymentController {
   @Post('/wallets/withdraw-methods')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.ADMIN])
+  @ApiBearerAuth()
+  @ApiTags('Withdraw Methods')
+  @ApiOperation({ summary: 'Add withdraw method', description: 'Add bank account or e-wallet for withdrawal (max 5 methods)' })
+  @ApiBody({ type: AddWithdrawMethodRequest })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Withdraw method added. Account number is encrypted in storage.',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/WithdrawMethodResponse' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Maximum 5 withdraw methods reached' })
   async addWithdrawMethod(
     @Auth() user: User,
     @Body() request: AddWithdrawMethodRequest,
@@ -131,6 +224,19 @@ export class PaymentController {
   @Get('/wallets/withdraw-methods')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA])
+  @ApiBearerAuth()
+  @ApiTags('Withdraw Methods')
+  @ApiOperation({ summary: 'Get withdraw methods', description: 'Get all active withdraw methods for user' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Withdraw methods retrieved. Account numbers are decrypted.',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/ListWithdrawMethodResponse' }
+      }
+    }
+  })
   async getWithdrawMethod(
     @Auth() user: User,
   ): Promise<WebResponse<ListWithdrawMethodResponse>> {
@@ -143,6 +249,21 @@ export class PaymentController {
   @Delete('/wallets/withdraw-methods/:methodId')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA])
+  @ApiBearerAuth()
+  @ApiTags('Withdraw Methods')
+  @ApiOperation({ summary: 'Delete withdraw method', description: 'Delete saved withdraw method (must be owner and active)' })
+  @ApiParam({ name: 'methodId', type: Number, description: 'Method ID' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Withdraw method deleted',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Metode penarikan berhasil dihapus' }
+      }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Withdraw method not found or not active' })
   async deleteWithdrawMethod(
     @Auth() user: User,
     @Param('methodId', ParseIntPipe) methodId: number,
@@ -163,6 +284,27 @@ export class PaymentController {
   @Post('/wallets/withdraw-requests')
   @HttpCode(201)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA])
+  @ApiBearerAuth()
+  @ApiTags('Withdraw Requests - User')
+  @ApiOperation({ 
+    summary: 'Create withdraw request', 
+    description: 'Submit new withdrawal request (minimum: 10,000). Deducts balance immediately, adds fee to platform wallet, creates PENDING transaction.' 
+  })
+  @ApiBody({ type: CreateWithdrawRequestRequest })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Withdraw request created',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Withdraw request created successfully' },
+        data: { $ref: '#/components/schemas/WithdrawRequestResponse' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Insufficient balance' })
+  @ApiResponse({ status: 404, description: 'Withdraw method not found or wallet not found' })
+  @ApiResponse({ status: 500, description: 'Withdraw fee not found' })
   async createWithdrawRequest(
     @Auth() user: User,
     @Body() request: CreateWithdrawRequestRequest,
@@ -180,6 +322,24 @@ export class PaymentController {
   @Get('wallets/withdraw/preview')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA])
+  @ApiBearerAuth()
+  @ApiTags('Withdraw Requests - User')
+  @ApiOperation({ summary: 'Preview withdraw', description: 'Calculate fees and net amount before withdrawal. Validates wallet status and balance.' })
+  @ApiQuery({ name: 'amount', type: Number, required: true, description: 'Amount to withdraw' })
+  @ApiQuery({ name: 'method_id', type: Number, required: true, description: 'Withdraw method ID' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Withdraw preview with fee calculation',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/WithdrawPreviewResponse' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Insufficient balance, amount too small for fee, or method not found' })
+  @ApiResponse({ status: 404, description: 'Wallet not found or not active' })
+  @ApiResponse({ status: 500, description: 'Fee not found' })
   async withdrawPreview(
     @Auth() user: User,
     @Query(new ZodValidationPipe(PaymentValidation.WITHDRAW_PREVIEW))
@@ -192,6 +352,19 @@ export class PaymentController {
   @Get('/wallets/withdraw-requests')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA])
+  @ApiBearerAuth()
+  @ApiTags('Withdraw Requests - User')
+  @ApiOperation({ summary: 'Get user withdraw requests', description: 'Get all withdraw requests for logged-in user, sorted by creation date (newest first)' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Withdraw requests retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/ListWithdrawRequestResponse' }
+      }
+    }
+  })
   async getUserWithdrawRequests(
     @Auth() user: User,
   ): Promise<WebResponse<ListWithdrawRequestResponse>> {
@@ -204,6 +377,21 @@ export class PaymentController {
   @Get('/wallets/withdraw-requests/:id')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA])
+  @ApiBearerAuth()
+  @ApiTags('Withdraw Requests - User')
+  @ApiOperation({ summary: 'Get withdraw request detail', description: 'Get detailed withdraw request information (must be owner)' })
+  @ApiParam({ name: 'id', type: Number, description: 'Withdraw request ID' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Withdraw request details',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/WithdrawRequestResponse' }
+      }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Withdraw request not found' })
   async getWithdrawRequestDetail(
     @Auth() user: User,
     @Param('id', ParseIntPipe) id: number,
@@ -224,6 +412,21 @@ export class PaymentController {
   @Get('/admin/withdraw-requests')
   @HttpCode(200)
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiTags('Admin - Withdraw Management')
+  @ApiOperation({ summary: 'Get all withdraw requests', description: 'Get all withdraw requests with filtering (Admin only), sorted by creation date (newest first)' })
+  @ApiQuery({ name: 'status', required: false, enum: ['PENDING', 'PROCESSING', 'APPROVED', 'REJECTED', 'SENT'] })
+  @ApiQuery({ name: 'user_id', required: false, type: String, description: 'Filter by user ID' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Withdraw requests retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/ListWithdrawRequestResponse' }
+      }
+    }
+  })
   async getAllWithdrawRequests(
     @Auth() admin: User,
     @Query() query: WithdrawRequestQueryParams,
@@ -237,6 +440,24 @@ export class PaymentController {
   @Post('/admin/withdraw-requests/:id/lock')
   @HttpCode(200)
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiTags('Admin - Withdraw Management')
+  @ApiOperation({ summary: 'Lock withdraw request', description: 'Lock withdraw request for processing (changes status from PENDING to PROCESSING). Prevents other admins from processing.' })
+  @ApiParam({ name: 'id', type: Number, description: 'Withdraw request ID' })
+  @ApiBody({ type: LockWithdrawRequest })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Withdraw request locked',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Withdraw request locked' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Only PENDING requests can be locked' })
+  @ApiResponse({ status: 404, description: 'Withdraw request not found' })
+  @ApiResponse({ status: 409, description: 'Request is being processed by another admin' })
   async lockWithdrawRequest(
     @Auth() admin: User,
     @Param('id', ParseIntPipe) id: number,
@@ -251,6 +472,23 @@ export class PaymentController {
   @Post('/admin/withdraw-requests/:id/unlock')
   @HttpCode(200)
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiTags('Admin - Withdraw Management')
+  @ApiOperation({ summary: 'Unlock withdraw request', description: 'Unlock withdraw request (changes status from PROCESSING to PENDING). Must be locked by current admin.' })
+  @ApiParam({ name: 'id', type: Number, description: 'Withdraw request ID' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Withdraw request unlocked',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Withdraw request unlocked' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Only PROCESSING requests can be unlocked' })
+  @ApiResponse({ status: 403, description: 'Can only unlock requests locked by you' })
+  @ApiResponse({ status: 404, description: 'Withdraw request not found' })
   async unlockWithdrawRequest(
     @Auth() admin: User,
     @Param('id', ParseIntPipe) id: number,
@@ -264,6 +502,28 @@ export class PaymentController {
   @Post('/admin/withdraw-requests/:id/approve')
   @HttpCode(200)
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiTags('Admin - Withdraw Management')
+  @ApiOperation({ 
+    summary: 'Approve withdraw request', 
+    description: 'Approve withdraw request for payment (changes status to APPROVED). Returns decrypted account details for payment.' 
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Withdraw request ID' })
+  @ApiBody({ type: ApproveWithdrawRequest })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Withdraw approved. Returns account details for payment.',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Withdraw approved' },
+        data: { $ref: '#/components/schemas/WithdrawMethodReadyToPay' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Only PROCESSING requests can be approved' })
+  @ApiResponse({ status: 403, description: 'Can only approve requests locked by you' })
+  @ApiResponse({ status: 404, description: 'Withdraw request not found' })
   async approveWithdrawRequest(
     @Auth() admin: User,
     @Param('id', ParseIntPipe) id: number,
@@ -283,6 +543,27 @@ export class PaymentController {
   @Post('/admin/withdraw-requests/:id/reject')
   @HttpCode(200)
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiTags('Admin - Withdraw Management')
+  @ApiOperation({ 
+    summary: 'Reject withdraw request', 
+    description: 'Reject withdraw request with reason (changes status to REJECTED). Refunds balance to user wallet, refunds fee from platform wallet, creates FUNDING transaction.' 
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Withdraw request ID' })
+  @ApiBody({ type: RejectWithdrawRequest })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Withdraw rejected and balance refunded',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Withdraw rejected' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Only PROCESSING requests can be rejected' })
+  @ApiResponse({ status: 403, description: 'Can only reject requests locked by you' })
+  @ApiResponse({ status: 404, description: 'Withdraw request not found' })
   async rejectWithdrawRequest(
     @Auth() admin: User,
     @Param('id', ParseIntPipe) id: number,
@@ -297,6 +578,26 @@ export class PaymentController {
   @Post('/admin/withdraw-requests/:id/send')
   @HttpCode(200)
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiTags('Admin - Withdraw Management')
+  @ApiOperation({ 
+    summary: 'Mark withdraw as sent', 
+    description: 'Mark withdraw as sent with transfer receipt (changes status to SENT). Updates transaction status to COMPLETED. Only APPROVED requests can be sent.' 
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Withdraw request ID' })
+  @ApiBody({ type: SendWithdrawRequest })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Withdraw sent successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Withdraw sent successfully' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Only APPROVED requests can be sent' })
+  @ApiResponse({ status: 404, description: 'Withdraw request not found' })
   async sendWithdrawRequest(
     @Auth() admin: User,
     @Param('id', ParseIntPipe) id: number,

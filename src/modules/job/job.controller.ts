@@ -25,7 +25,18 @@ import { Auth } from '../../common/auth/auth.decorator';
 import { Roles } from '../../common/role/role.decorator';
 import type { User } from '@prisma/client';
 import { ROLES } from '../../common/role/role';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 
+@ApiTags('Job Management')
+@ApiBearerAuth()
 @Controller('/api/jobs')
 export class JobController {
   constructor(private jobService: JobService) {}
@@ -38,6 +49,29 @@ export class JobController {
   @Post()
   @HttpCode(201)
   @Roles([ROLES.PEMBERI_KERJA])
+  @ApiOperation({
+    summary: 'Create job',
+    description:
+      'Create new job posting (Job Provider only). Wallet must be ACTIVE.',
+  })
+  @ApiBody({ type: CreateJobRequest })
+  @ApiResponse({
+    status: 201,
+    description: 'Job created successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Lowongan berhasil dibuat' },
+        data: { $ref: '#/components/schemas/JobResponse' },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Wallet suspended or closed' })
+  @ApiResponse({
+    status: 403,
+    description: 'Only job providers can create jobs',
+  })
+  @ApiResponse({ status: 404, description: 'Provider not found' })
   async createJob(
     @Auth() user: User,
     @Body() request: CreateJobRequest,
@@ -50,13 +84,37 @@ export class JobController {
   }
 
   /**
-   * PUT /api/jobs/{job_id}
+   * PUT /{job_id}
    * Memperbarui lowongan pekerjaan
    * Role: Pemberi Kerja (2)
    */
   @Put('/:jobId')
   @HttpCode(200)
   @Roles([ROLES.PEMBERI_KERJA])
+  @ApiOperation({
+    summary: 'Update job',
+    description:
+      'Update job information (Job Provider only). Cannot update if already has worker or cancelled.',
+  })
+  @ApiParam({ name: 'jobId', type: Number, description: 'Job ID' })
+  @ApiBody({ type: UpdateJobRequest })
+  @ApiResponse({
+    status: 200,
+    description: 'Job updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Lowongan berhasil diperbarui' },
+        data: { $ref: '#/components/schemas/JobResponse' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Job already has worker or is cancelled',
+  })
+  @ApiResponse({ status: 403, description: 'No access to this job' })
+  @ApiResponse({ status: 404, description: 'Job not found' })
   async updateJob(
     @Auth() user: User,
     @Param('jobId', ParseIntPipe) jobId: number,
@@ -77,6 +135,25 @@ export class JobController {
   @Delete('/:jobId')
   @HttpCode(200)
   @Roles([ROLES.PEMBERI_KERJA])
+  @ApiOperation({
+    summary: 'Delete job',
+    description:
+      'Delete job posting (Job Provider only). Cannot delete if has assigned worker.',
+  })
+  @ApiParam({ name: 'jobId', type: Number, description: 'Job ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Job deleted successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Lowongan berhasil dihapus' },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Job has assigned worker' })
+  @ApiResponse({ status: 403, description: 'No access to this job' })
+  @ApiResponse({ status: 404, description: 'Job not found' })
   async deleteJob(
     @Auth() user: User,
     @Param('jobId', ParseIntPipe) jobId: number,
@@ -94,6 +171,22 @@ export class JobController {
    */
   @Get('/:jobId')
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Get job detail',
+    description: 'Get detailed job information (Public)',
+  })
+  @ApiParam({ name: 'jobId', type: Number, description: 'Job ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Job details retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/JobResponse' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Job not found' })
   async getJobDetail(
     @Param('jobId', ParseIntPipe) jobId: number,
   ): Promise<WebResponse<JobResponse>> {
@@ -110,6 +203,75 @@ export class JobController {
    */
   @Get()
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Search jobs',
+    description:
+      'Search and filter job listings (Public). Default shows OPEN jobs only.',
+  })
+  @ApiQuery({
+    name: 'keyword',
+    required: false,
+    type: String,
+    description: 'Search in title and description',
+  })
+  @ApiQuery({
+    name: 'location',
+    required: false,
+    type: String,
+    description: 'Job location',
+  })
+  @ApiQuery({
+    name: 'min_compensation',
+    required: false,
+    type: Number,
+    description: 'Minimum compensation',
+  })
+  @ApiQuery({
+    name: 'max_compensation',
+    required: false,
+    type: Number,
+    description: 'Maximum compensation',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    type: String,
+    description: 'Job status (default: OPEN)',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10)',
+  })
+  @ApiQuery({
+    name: 'sort_by',
+    required: false,
+    enum: ['posted_at', 'compensation_amount', 'title'],
+    description: 'Sort field (default: posted_at)',
+  })
+  @ApiQuery({
+    name: 'sort_order',
+    required: false,
+    enum: ['asc', 'desc'],
+    description: 'Sort order (default: desc)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Job list retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/JobListResponse' },
+      },
+    },
+  })
   async searchJobs(
     @Query('keyword') keyword?: string,
     @Query('location') location?: string,
@@ -150,6 +312,40 @@ export class JobController {
   @Get('/provider/history')
   @HttpCode(200)
   @Roles([ROLES.PEMBERI_KERJA])
+  @ApiOperation({
+    summary: 'Get provider job history',
+    description:
+      'Get all jobs posted by provider with filtering (Job Provider only)',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'],
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({
+    name: 'sort_by',
+    required: false,
+    enum: ['posted_at', 'status'],
+    description: 'Sort field (default: posted_at)',
+  })
+  @ApiQuery({
+    name: 'sort_order',
+    required: false,
+    enum: ['asc', 'desc'],
+    description: 'Sort order (default: desc)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Job history retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/JobListResponse' },
+      },
+    },
+  })
   async getProviderJobHistory(
     @Auth() user: User,
     @Query('status') status?: string,
@@ -179,6 +375,21 @@ export class JobController {
   @Get('/provider/active')
   @HttpCode(200)
   @Roles([ROLES.PEMBERI_KERJA])
+  @ApiOperation({
+    summary: 'Get active jobs',
+    description:
+      'Get active jobs: OPEN, ASSIGNED, IN_PROGRESS (Job Provider only)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Active jobs retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/JobListResponse' },
+      },
+    },
+  })
   async getActiveJobs(
     @Auth() user: User,
   ): Promise<WebResponse<JobListResponse>> {
@@ -196,6 +407,20 @@ export class JobController {
   @Get('/provider/completed')
   @HttpCode(200)
   @Roles([ROLES.PEMBERI_KERJA])
+  @ApiOperation({
+    summary: 'Get completed jobs',
+    description: 'Get completed jobs: COMPLETED, CANCELLED (Job Provider only)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Completed jobs retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/JobListResponse' },
+      },
+    },
+  })
   async getCompletedJobs(
     @Auth() user: User,
   ): Promise<WebResponse<JobListResponse>> {
@@ -213,6 +438,29 @@ export class JobController {
   @Patch('/:jobId/status/worker')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA])
+  @ApiOperation({
+    summary: 'Update job status (Worker)',
+    description:
+      'Update job to IN_PROGRESS or COMPLETED (Worker only). Cannot update if already APPROVED.',
+  })
+  @ApiParam({ name: 'jobId', type: Number, description: 'Job ID' })
+  @ApiBody({ type: UpdateWorkerJobStatusRequest })
+  @ApiResponse({
+    status: 200,
+    description: 'Job status updated',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example: 'Status pekerjaan berhasil diperbarui',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Job already approved' })
+  @ApiResponse({ status: 403, description: 'No access to this job' })
+  @ApiResponse({ status: 404, description: 'Job not found' })
   async updateWorkerJobStatus(
     @Auth() user: User,
     @Param('jobId', ParseIntPipe) jobId: number,
@@ -231,6 +479,40 @@ export class JobController {
   @Patch('/:jobId/status/employer')
   @HttpCode(200)
   @Roles([ROLES.PEMBERI_KERJA])
+  @ApiOperation({
+    summary: 'Update job status (Employer)',
+    description:
+      'Update job status (Job Provider only): CANCELLED (if no worker), REJECTED (if COMPLETED, max 3 times), APPROVED (releases escrow and completes payment)',
+  })
+  @ApiParam({ name: 'jobId', type: Number, description: 'Job ID' })
+  @ApiBody({ type: UpdateEmployerJobStatusRequest })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Job status updated. Returns specific messages based on action.',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          enum: [
+            'Lowongan berhasil dibatalkan',
+            'Pekerjaan berhasil ditolak',
+            'Pekerjaan berhasil disetujui dan pembayaran telah dirilis',
+            'Status pekerjaan tidak diubah',
+          ],
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid status transition or job has worker (for cancel), or not COMPLETED (for reject/approve), or no worker (for approve)',
+  })
+  @ApiResponse({ status: 403, description: 'No access to this job' })
+  @ApiResponse({ status: 404, description: 'Job or escrow not found' })
+  @ApiResponse({ status: 500, description: 'Escrow fee not found or invalid' })
   async updateEmployerJobStatus(
     @Auth() user: User,
     @Param('jobId', ParseIntPipe) jobId: number,
