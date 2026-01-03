@@ -17,6 +17,8 @@ import { JwtModule, JwtService } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
 import { RoleGuard } from './role/role.guard';
 import { BullModule } from '@nestjs/bull';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Global()
 @Module({
@@ -44,6 +46,10 @@ import { BullModule } from '@nestjs/bull';
       signOptions: { expiresIn: '15m' },
     }),
     ScheduleModule.forRoot(),
+    ServeStaticModule.forRoot({
+      serveRoot: '/uploads',
+      rootPath: join(process.cwd(), 'uploads'),
+    }),
   ],
   providers: [
     JwtService,

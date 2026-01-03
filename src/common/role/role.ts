@@ -1,4 +1,4 @@
-export const ROLES = {
+export const ROLES  = {
   PEKERJA: 1,
   PEMBERI_KERJA: 2,
   ADMIN: 3,

@@ -376,7 +376,7 @@ export class PaymentController {
 
   @Get('/wallets/withdraw-requests/:id')
   @HttpCode(200)
-  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA])
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   @ApiBearerAuth()
   @ApiTags('Withdraw Requests - User')
   @ApiOperation({ summary: 'Get withdraw request detail', description: 'Get detailed withdraw request information (must be owner)' })
@@ -399,6 +399,7 @@ export class PaymentController {
     const result = await this.paymentService.getWithdrawRequestDetail(
       id,
       user.id,
+      user.role_id,
     );
     return {
       data: result,

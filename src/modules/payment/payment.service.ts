@@ -38,6 +38,7 @@ import {
 import { MidtransService } from './midtrans/midtrans.service';
 import { CryptoUtil } from '../../common/crypto.util';
 import { dec } from '../../common/decimal.util';
+import { ROLES } from 'src/common/role/role';
 
 @Injectable()
 export class PaymentService {
@@ -523,11 +524,13 @@ export class PaymentService {
   async getWithdrawRequestDetail(
     requestId: number,
     userId: string,
+    roleId: number,
   ): Promise<WithdrawRequestResponse> {
+    const isAdmin = roleId == ROLES.ADMIN || roleId == ROLES.SUPER_ADMIN;
     const request = await this.prismaService.withdrawRequest.findFirst({
       where: {
         id: requestId,
-        user_id: userId,
+        ...(isAdmin ? {} : { user_id: userId }),
       },
       include: {
         method: true,
