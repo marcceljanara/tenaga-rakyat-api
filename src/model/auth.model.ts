@@ -29,7 +29,7 @@ export class VerifyEmailResponse {
 }
 
 export class ResendVerificationRequest {
-  @ApiProperty({ enum: ['REGISTRATION', 'EMAIL_CHANGE', 'PASSWORD_RESET'], example: 'REGISTRATION' })
+  @ApiProperty({ enum: ['REGISTER', 'EMAIL_CHANGE', 'PASSWORD_RESET'], example: 'REGISTER' })
   purpose: VerificationPurpose;
 }
 
