@@ -26,4 +26,8 @@ export class UserValidation {
     about: z.string().max(2500).optional(),
     cv_url: z.string().max(512).optional(),
   });
+
+  static readonly GET_PROFILE = z.object({
+    id: z.uuidv4(),
+  });
 }

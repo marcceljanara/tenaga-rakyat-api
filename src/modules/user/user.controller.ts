@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  Param,
   Post,
   Put,
   Req,
@@ -205,6 +206,37 @@ export class UserController {
     return {
       data: response,
     };
+  }
+
+  @Get('/profile/:id')
+  @HttpCode(200)
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get profile by ID', description: 'Get user profile by ID with role, photos (up to recent ones), and all details' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Profile retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/UserResponse' }
+      }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'User not found' , schema: {
+    type: 'object',
+    properties: {
+      errors: { type: 'string', example: 'User not found'}
+    }
+  }})
+  async getProfileById(
+    @Auth() user: User,
+    @Param('id') userId: string,
+  ): Promise<WebResponse<UserResponse>> {
+    const response = await this.userService.getUserProfileById(userId);
+    return {
+      data: response,
+    }
   }
 
   @Put('/profile')

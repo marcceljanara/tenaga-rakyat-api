@@ -207,6 +207,27 @@ export class UserService {
     return this.toUserResponse(user);
   }
 
+  async getUserProfileById(userId: string): Promise<UserResponse> {
+    this.logger.debug(`User ID: ${JSON.stringify(userId)}`);
+    const userRequest = this.validationService.validate(UserValidation.GET_PROFILE, { id: userId });
+    const user = await this.prismaService.user.findUnique({
+      where: {
+        id: userRequest.id,
+      },
+      include: {
+        role: true,
+        user_photos: true,
+      }
+    });
+
+    if (!user) {
+      throw new HttpException('User tidak ditemukan', 404);
+    }
+
+    return this.toUserGeneralResponse(user);
+
+  }
+
   async editProfile(
     userId: string,
     request: EditUserRequest,
@@ -267,5 +288,32 @@ export class UserService {
       update_at: response.updated_at,
       created_at: response.created_at,
     };
+  }
+
+  toUserGeneralResponse(
+    response: Prisma.UserGetPayload<{
+      include: {
+        role: true;
+        user_photos: true;
+      };
+    }>,
+  ): UserResponse {
+    return {
+      id: response.id,
+      full_name: response.full_name,
+      role: response.role?.name,
+      average_rating: response.average_rating?.toNumber(),
+      profile_picture_url: response.profile_picture_url,
+      verification_status: response.verification_status,
+      about: response.about,
+      cv_url: response.cv_url,
+      photos: response.user_photos?.map((photo) => ({
+        id: photo.id.toString(),
+        photo_url: photo.photo_url,
+        description: photo.description,
+        created_at: photo.created_at,
+        updated_at: photo.updated_at,
+      })),
+    }
   }
 }
