@@ -121,6 +121,11 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+enum PaymentMethod {
+  ESCROW_SYSTEM
+  CASH_OFFLINE
+}
+
 model Job {
   id Int @id @default(autoincrement())
   provider_id String 
@@ -130,6 +135,7 @@ model Job {
   jobTransactions Transaction[]
   jobApplications JobApplication[]
   jobEscrow Escrow?
+  payment_method PaymentMethod @default(ESCROW_SYSTEM)
   title String @db.VarChar(255)
   description String @db.Text
   location String? @db.VarChar(255)
