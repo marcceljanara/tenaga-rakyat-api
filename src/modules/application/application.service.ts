@@ -19,7 +19,7 @@ import {
   Prisma,
   WalletStatus,
 } from '@prisma/client';
-import { ROLES } from 'src/common/role/role';
+import { ROLES } from '../../common/role/role';
 
 @Injectable()
 export class ApplicationService {

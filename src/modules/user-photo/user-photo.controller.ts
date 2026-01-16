@@ -23,7 +23,14 @@ import { Auth } from '../../common/auth/auth.decorator';
 import { Roles } from '../../common/role/role.decorator';
 import type { User } from '@prisma/client';
 import { ROLES } from '../../common/role/role';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiParam,
+} from '@nestjs/swagger';
 
 @ApiTags('User Photos')
 @ApiBearerAuth()
@@ -35,31 +42,35 @@ export class UserPhotoController {
   @HttpCode(201)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   @UseInterceptors(FileInterceptor('photo'))
-  @ApiOperation({ 
-    summary: 'Add photo', 
-    description: 'Upload new photo to user portfolio. Allowed: JPEG, PNG, WebP. Max size: 5MB. File is saved with unique filename.' 
+  @ApiOperation({
+    summary: 'Add photo',
+    description:
+      'Upload new photo to user portfolio. Allowed: JPEG, PNG, WebP. Max size: 5MB. File is saved with unique filename.',
   })
-  @ApiBody({ 
+  @ApiBody({
     schema: {
       type: 'object',
       properties: {
         photo: { type: 'string', format: 'binary', description: 'Photo file' },
-        description: { type: 'string', example: 'My portfolio work' }
-      }
-    }
+        description: { type: 'string', example: 'My portfolio work' },
+      },
+    },
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Photo uploaded successfully',
     schema: {
       type: 'object',
       properties: {
         message: { type: 'string', example: 'Photo uploaded successfully' },
-        data: { $ref: '#/components/schemas/UserPhotoResponse' }
-      }
-    }
+        data: { $ref: '#/components/schemas/UserPhotoResponse' },
+      },
+    },
   })
-  @ApiResponse({ status: 400, description: 'Photo file required or file size exceeds 5MB' })
+  @ApiResponse({
+    status: 400,
+    description: 'Photo file required or file size exceeds 5MB',
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 422, description: 'Invalid file type' })
   async addPhoto(
@@ -77,19 +88,23 @@ export class UserPhotoController {
   @Get()
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
-  @ApiOperation({ summary: 'Get user photos', description: 'Get all photos for logged-in user, sorted by creation date (newest first)' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiOperation({
+    summary: 'Get user photos',
+    description:
+      'Get all photos for logged-in user, sorted by creation date (newest first)',
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Photos retrieved',
     schema: {
       type: 'object',
       properties: {
         data: {
           type: 'array',
-          items: { $ref: '#/components/schemas/UserPhotoResponse' }
-        }
-      }
-    }
+          items: { $ref: '#/components/schemas/UserPhotoResponse' },
+        },
+      },
+    },
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserPhotos(
@@ -104,17 +119,20 @@ export class UserPhotoController {
   @Get('/:photoId')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
-  @ApiOperation({ summary: 'Get photo by ID', description: 'Get specific photo details (must be owner)' })
+  @ApiOperation({
+    summary: 'Get photo by ID',
+    description: 'Get specific photo details (must be owner)',
+  })
   @ApiParam({ name: 'photoId', type: Number, description: 'Photo ID' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Photo details retrieved',
     schema: {
       type: 'object',
       properties: {
-        data: { $ref: '#/components/schemas/UserPhotoResponse' }
-      }
-    }
+        data: { $ref: '#/components/schemas/UserPhotoResponse' },
+      },
+    },
   })
   @ApiResponse({ status: 404, description: 'Photo not found' })
   async getPhotoById(
@@ -130,19 +148,25 @@ export class UserPhotoController {
   @Put('/:photoId')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
-  @ApiOperation({ summary: 'Edit photo description', description: 'Update photo description (must be owner)' })
+  @ApiOperation({
+    summary: 'Edit photo description',
+    description: 'Update photo description (must be owner)',
+  })
   @ApiParam({ name: 'photoId', type: Number, description: 'Photo ID' })
   @ApiBody({ type: EditUserPhotoRequest })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Photo description updated',
     schema: {
       type: 'object',
       properties: {
-        message: { type: 'string', example: 'Photo description updated successfully' },
-        data: { $ref: '#/components/schemas/UserPhotoResponse' }
-      }
-    }
+        message: {
+          type: 'string',
+          example: 'Photo description updated successfully',
+        },
+        data: { $ref: '#/components/schemas/UserPhotoResponse' },
+      },
+    },
   })
   @ApiResponse({ status: 404, description: 'Photo not found or unauthorized' })
   async editPhotoDescription(
@@ -164,17 +188,20 @@ export class UserPhotoController {
   @Delete('/:photoId')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
-  @ApiOperation({ summary: 'Delete photo', description: 'Delete photo from portfolio and storage (must be owner)' })
+  @ApiOperation({
+    summary: 'Delete photo',
+    description: 'Delete photo from portfolio and storage (must be owner)',
+  })
   @ApiParam({ name: 'photoId', type: Number, description: 'Photo ID' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Photo deleted',
     schema: {
       type: 'object',
       properties: {
-        message: { type: 'string', example: 'Photo deleted successfully' }
-      }
-    }
+        message: { type: 'string', example: 'Photo deleted successfully' },
+      },
+    },
   })
   @ApiResponse({ status: 404, description: 'Photo not found or unauthorized' })
   async deletePhoto(

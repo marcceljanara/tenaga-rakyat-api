@@ -16,7 +16,7 @@ import {
 import { JobValidation } from './job.validation';
 import { JobStatus, Prisma, WalletStatus } from '@prisma/client';
 import { dec } from '../../common/decimal.util';
-import { ROLES } from 'src/common/role/role';
+import { ROLES } from '../../common/role/role';
 
 @Injectable()
 export class JobService {
@@ -575,7 +575,7 @@ export class JobService {
 
     // Filter by location
     if (query.location) {
-      where.location = {
+      where.location_label = {
         contains: query.location,
         mode: 'insensitive' as Prisma.QueryMode,
       };

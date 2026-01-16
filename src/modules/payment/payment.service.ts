@@ -38,7 +38,7 @@ import {
 import { MidtransService } from './midtrans/midtrans.service';
 import { CryptoUtil } from '../../common/crypto.util';
 import { dec } from '../../common/decimal.util';
-import { ROLES } from 'src/common/role/role';
+import { ROLES } from '../../common/role/role';
 
 @Injectable()
 export class PaymentService {
