@@ -31,7 +31,7 @@ import { join } from 'path';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    
+
     // Bull Queue Configuration
     BullModule.forRoot({
       redis: {
@@ -73,7 +73,7 @@ export class CommonModule implements NestModule {
       .apply(AuthMiddleware)
       .exclude(
         {
-          path: '/api/jobs/:jobId',
+          path: '/api/jobs/:jobId/public',
           method: RequestMethod.GET,
         },
         {

@@ -19,6 +19,7 @@ import {
   Prisma,
   WalletStatus,
 } from '@prisma/client';
+import { ROLES } from 'src/common/role/role';
 
 @Injectable()
 export class ApplicationService {
@@ -84,7 +85,7 @@ export class ApplicationService {
       throw new HttpException('Pekerja tidak ditemukan', 404);
     }
 
-    if (worker.role_id !== 1) {
+    if (worker.role_id !== ROLES.PEKERJA) {
       throw new HttpException(
         'Hanya pekerja yang dapat melamar pekerjaan',
         403,
@@ -402,6 +403,77 @@ export class ApplicationService {
 
     // --- BRANCH ACCEPTED: lakukan semua cek & perubahan di dalam TRANSAKSI ---
     if (statusRequest.status === ApplicationStatus.ACCEPTED) {
+      if (application.job.payment_method !== 'ESCROW_SYSTEM') {
+        if (application.job.status !== JobStatus.OPEN) {
+          throw new HttpException(
+            'Lowongan sudah tidak menerima perubahan status',
+            400,
+          );
+        }
+        const updatedApplication = await this.prismaService.$transaction(
+          async (tx) => {
+            // Assign job langsung tanpa escrow
+            await tx.job.update({
+              where: {
+                id: application.job_id,
+              },
+              data: {
+                status: JobStatus.ASSIGNED,
+                worker_id: application.worker_id,
+              },
+            });
+            await tx.jobApplication.updateMany({
+              where: {
+                job_id: application.job_id,
+                id: { not: applicationId },
+                status: {
+                  in: [
+                    ApplicationStatus.PENDING,
+                    ApplicationStatus.UNDER_REVIEW,
+                  ],
+                },
+              },
+              data: { status: ApplicationStatus.REJECTED },
+            });
+            // Terakhir: update application yang diterima → set jadi ACCEPTED
+            const updatedApp = await tx.jobApplication.update({
+              where: { id: applicationId },
+              data: { status: ApplicationStatus.ACCEPTED },
+              include: {
+                job: {
+                  include: {
+                    provider: {
+                      select: {
+                        id: true,
+                        full_name: true,
+                        profile_picture_url: true,
+                        average_rating: true,
+                      },
+                    },
+                  },
+                },
+                worker: {
+                  select: {
+                    id: true,
+                    full_name: true,
+                    email: true,
+                    phone_number: true,
+                    profile_picture_url: true,
+                    about: true,
+                    cv_url: true,
+                    average_rating: true,
+                    verification_status: true,
+                  },
+                },
+              },
+            });
+
+            // kembalikan updated application dari dalam transaksi
+            return updatedApp;
+          },
+        );
+        return this.mapToApplicationResponse(updatedApplication);
+      }
       // Semua DB op yang berhubungan harus menggunakan `tx`
       const updatedApplication = await this.prismaService.$transaction(
         async (tx) => {
@@ -752,6 +824,7 @@ export class ApplicationService {
               description: String(application.job.description),
               location: application.job.location,
               compensation_amount: Number(application.job.compensation_amount),
+              payment_method: application.job.payment_method,
               status: String(application.job.status),
               provider: {
                 id: String(application.job.provider.id),

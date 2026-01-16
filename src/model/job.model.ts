@@ -4,7 +4,10 @@ export class CreateJobRequest {
   @ApiProperty({ example: 'Web Developer Needed', description: 'Job title' })
   title: string;
 
-  @ApiProperty({ example: 'We need an experienced web developer...', description: 'Job description' })
+  @ApiProperty({
+    example: 'We need an experienced web developer...',
+    description: 'Job description',
+  })
   description: string;
 
   @ApiPropertyOptional({ example: 'Jakarta', description: 'Job location' })
@@ -12,19 +15,34 @@ export class CreateJobRequest {
 
   @ApiProperty({ example: 5000000, description: 'Compensation amount in IDR' })
   compensation_amount: number;
+
+  @ApiProperty({
+    enum: ['ESCROW_SYSTEM', 'CASH_OFFLINE'],
+    example: 'ESCROW_SYSTEM',
+  })
+  payment_method: 'ESCROW_SYSTEM' | 'CASH_OFFLINE';
 }
 
 export class UpdateJobRequest {
-  @ApiPropertyOptional({ example: 'Senior Web Developer', description: 'Updated job title' })
+  @ApiPropertyOptional({
+    example: 'Senior Web Developer',
+    description: 'Updated job title',
+  })
   title?: string;
 
-  @ApiPropertyOptional({ example: 'Updated job description...', description: 'Updated description' })
+  @ApiPropertyOptional({
+    example: 'Updated job description...',
+    description: 'Updated description',
+  })
   description?: string;
 
   @ApiPropertyOptional({ example: 'Bandung', description: 'Updated location' })
   location?: string;
 
-  @ApiPropertyOptional({ example: 6000000, description: 'Updated compensation' })
+  @ApiPropertyOptional({
+    example: 6000000,
+    description: 'Updated compensation',
+  })
   compensation_amount?: number;
 }
 
@@ -34,7 +52,10 @@ export class UpdateWorkerJobStatusRequest {
 }
 
 export class UpdateEmployerJobStatusRequest {
-  @ApiProperty({ enum: ['CANCELLED', 'APPROVED', 'REJECTED'], example: 'APPROVED' })
+  @ApiProperty({
+    enum: ['CANCELLED', 'APPROVED', 'REJECTED'],
+    example: 'APPROVED',
+  })
   status: 'CANCELLED' | 'APPROVED' | 'REJECTED';
 }
 
@@ -61,6 +82,9 @@ export class JobResponse {
   compensation_amount: number;
 
   @ApiProperty()
+  payment_method: string;
+
+  @ApiProperty()
   status: string;
 
   @ApiProperty()
@@ -75,7 +99,8 @@ export class JobResponse {
     full_name: string;
     profile_picture_url: string | null;
     average_rating: number | null;
-    phone_number: string | null;
+    phone_number?: string | null;
+    email?: string;
   };
 
   @ApiPropertyOptional()
@@ -84,6 +109,8 @@ export class JobResponse {
     full_name: string;
     profile_picture_url: string | null;
     average_rating: number | null;
+    phone_number: string;
+    email: string;
   };
 
   @ApiPropertyOptional()
@@ -136,7 +163,9 @@ export class JobSearchQuery {
 }
 
 export class ProviderJobHistoryQuery {
-  @ApiPropertyOptional({ enum: ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] })
+  @ApiPropertyOptional({
+    enum: ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'],
+  })
   status?: 'OPEN' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
   @ApiPropertyOptional()

@@ -1,12 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ApplyJobRequest {
-  @ApiProperty({ example: 'I am very interested in this position...', description: 'Cover letter for application' })
+  @ApiProperty({
+    example: 'I am very interested in this position...',
+    description: 'Cover letter for application',
+  })
   cover_letter: string;
 }
 
 export class UpdateApplicationStatusRequest {
-  @ApiProperty({ enum: ['ACCEPTED', 'REJECTED', 'UNDER_REVIEW'], example: 'ACCEPTED' })
+  @ApiProperty({
+    enum: ['ACCEPTED', 'REJECTED', 'UNDER_REVIEW'],
+    example: 'ACCEPTED',
+  })
   status: 'ACCEPTED' | 'REJECTED' | 'UNDER_REVIEW';
 }
 
@@ -40,6 +46,7 @@ export class ApplicationResponse {
     location: string | null;
     compensation_amount: number;
     status: string;
+    payment_method: string;
     provider: {
       id: string;
       full_name: string;
