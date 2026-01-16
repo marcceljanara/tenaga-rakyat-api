@@ -209,7 +209,10 @@ export class UserService {
 
   async getUserProfileById(userId: string): Promise<UserResponse> {
     this.logger.debug(`User ID: ${JSON.stringify(userId)}`);
-    const userRequest = this.validationService.validate(UserValidation.GET_PROFILE, { id: userId });
+    const userRequest = this.validationService.validate(
+      UserValidation.GET_PROFILE,
+      { id: userId },
+    );
     const user = await this.prismaService.user.findUnique({
       where: {
         id: userRequest.id,
@@ -217,7 +220,7 @@ export class UserService {
       include: {
         role: true,
         user_photos: true,
-      }
+      },
     });
 
     if (!user) {
@@ -225,7 +228,6 @@ export class UserService {
     }
 
     return this.toUserGeneralResponse(user);
-
   }
 
   async editProfile(
@@ -314,6 +316,6 @@ export class UserService {
         created_at: photo.created_at,
         updated_at: photo.updated_at,
       })),
-    }
+    };
   }
 }

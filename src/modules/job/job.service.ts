@@ -16,6 +16,7 @@ import {
 import { JobValidation } from './job.validation';
 import { JobStatus, Prisma, WalletStatus } from '@prisma/client';
 import { dec } from '../../common/decimal.util';
+import { ROLES } from 'src/common/role/role';
 
 @Injectable()
 export class JobService {
@@ -79,6 +80,7 @@ export class JobService {
         compensation_amount: createRequest.compensation_amount,
         status: JobStatus.OPEN,
         completed_at: new Date(), // Temporary, will be updated when completed
+        payment_method: createRequest.payment_method,
       },
       include: {
         provider: {
@@ -98,7 +100,7 @@ export class JobService {
       },
     });
 
-    return this.mapToJobResponse(job);
+    return this.mapToJobResponsePrivate(job);
   }
 
   async updateJob(
@@ -175,7 +177,7 @@ export class JobService {
       },
     });
 
-    return this.mapToJobResponse(updatedJob);
+    return this.mapToJobResponsePrivate(updatedJob);
   }
 
   async deleteJob(jobId: number, providerId: string): Promise<void> {
@@ -308,7 +310,21 @@ export class JobService {
           400,
         );
       }
+
+      // CASH OFFLINE langsung tolak tanpa batasan
+      if (job.payment_method === 'CASH_OFFLINE') {
+        await this.prismaService.job.update({
+          where: {
+            id: jobId,
+          },
+          data: {
+            status: 'REJECTED',
+          },
+        });
+        return 'Pekerjaan berhasil ditolak';
+      }
       // Periska batasan penolakan
+      // Jika sudah 3 kali ditolak, kirim notifikasi ke admin untuk escrow
       await this.prismaService.job.update({
         where: {
           id: jobId,
@@ -336,6 +352,20 @@ export class JobService {
       }
       if (!job.worker_id) {
         throw new HttpException('Job tidak memiliki pekerja', 400);
+      }
+
+      // Jika hanya CASH_OFFLINE, langsung setujui tanpa transaksi escrow
+      if (job.payment_method === 'CASH_OFFLINE') {
+        await this.prismaService.job.update({
+          where: {
+            id: jobId,
+          },
+          data: {
+            status: 'APPROVED',
+            completed_at: new Date(),
+          },
+        });
+        return 'Pekerjaan berhasil disetujui dan silahkan lakukan pembayaran cash secara mandiri';
       }
       await this.prismaService.$transaction(async (tx) => {
         await tx.job.update({
@@ -433,11 +463,20 @@ export class JobService {
     return 'Status pekerjaan tidak diubah';
   }
 
-  async getJobDetail(jobId: number): Promise<JobResponse> {
+  async getJobDetailPrivate(
+    jobId: number,
+    userId: string,
+    roleId: number,
+  ): Promise<JobResponse> {
     this.logger.debug(`Getting job detail ${jobId}`);
-
+    const isAdmin = roleId == ROLES.ADMIN || roleId == ROLES.SUPER_ADMIN;
     const job = await this.prismaService.job.findUnique({
-      where: { id: jobId },
+      where: {
+        id: jobId,
+        ...(isAdmin
+          ? {}
+          : { OR: [{ provider_id: userId }, { worker_id: userId }] }),
+      },
       include: {
         provider: {
           select: {
@@ -445,9 +484,42 @@ export class JobService {
             full_name: true,
             profile_picture_url: true,
             average_rating: true,
+            phone_number: true,
+            email: true,
           },
         },
         worker: {
+          select: {
+            id: true,
+            full_name: true,
+            profile_picture_url: true,
+            average_rating: true,
+            phone_number: true,
+            email: true,
+          },
+        },
+        _count: {
+          select: {
+            jobApplications: true,
+          },
+        },
+      },
+    });
+
+    if (!job) {
+      throw new HttpException('Lowongan tidak ditemukan', 404);
+    }
+
+    return this.mapToJobResponsePrivate(job);
+  }
+  async getJobDetailPublic(jobId: number): Promise<JobResponse> {
+    this.logger.debug(`Getting job detail ${jobId}`);
+    const job = await this.prismaService.job.findUnique({
+      where: {
+        id: jobId,
+      },
+      include: {
+        provider: {
           select: {
             id: true,
             full_name: true,
@@ -467,7 +539,7 @@ export class JobService {
       throw new HttpException('Lowongan tidak ditemukan', 404);
     }
 
-    return this.mapToJobResponse(job);
+    return this.mapToJobResponsePrivate(job);
   }
 
   async searchJobs(query: JobSearchQuery): Promise<JobListResponse> {
@@ -552,7 +624,7 @@ export class JobService {
     ]);
 
     return {
-      jobs: jobs.map((job) => this.mapToJobResponse(job)),
+      jobs: jobs.map((job) => this.mapToJobResponsePublic(job)),
       total,
       page,
       limit,
@@ -619,7 +691,7 @@ export class JobService {
     ]);
 
     return {
-      jobs: jobs.map((job) => this.mapToJobResponse(job)),
+      jobs: jobs.map((job) => this.mapToJobResponsePrivate(job)),
       total,
       page,
       limit,
@@ -663,7 +735,7 @@ export class JobService {
     });
 
     return {
-      jobs: jobs.map((job) => this.mapToJobResponse(job)),
+      jobs: jobs.map((job) => this.mapToJobResponsePrivate(job)),
       total: jobs.length,
       page: 1,
       limit: jobs.length,
@@ -707,14 +779,14 @@ export class JobService {
     });
 
     return {
-      jobs: jobs.map((job) => this.mapToJobResponse(job)),
+      jobs: jobs.map((job) => this.mapToJobResponsePrivate(job)),
       total: jobs.length,
       page: 1,
       limit: jobs.length,
     };
   }
 
-  private mapToJobResponse(job: any): JobResponse {
+  private mapToJobResponsePrivate(job: any): JobResponse {
     return {
       id: Number(job.id),
       provider_id: job.provider_id,
@@ -723,6 +795,7 @@ export class JobService {
       description: job.description,
       location: job.location,
       compensation_amount: Number(job.compensation_amount),
+      payment_method: job.payment_method,
       status: job.status,
       posted_at: job.posted_at,
       completed_at: job.completed_at,
@@ -735,6 +808,7 @@ export class JobService {
               ? Number(job.provider.average_rating)
               : null,
             phone_number: job.provider.phone_number,
+            email: job.provider.email,
           }
         : undefined,
       worker: job.worker
@@ -744,6 +818,33 @@ export class JobService {
             profile_picture_url: job.worker.profile_picture_url,
             average_rating: job.worker.average_rating
               ? Number(job.worker.average_rating)
+              : null,
+            phone_number: job.worker.phone_number,
+            email: job.worker.email,
+          }
+        : undefined,
+    };
+  }
+  private mapToJobResponsePublic(job: any): JobResponse {
+    return {
+      id: Number(job.id),
+      provider_id: job.provider_id,
+      worker_id: job.worker_id,
+      title: job.title,
+      description: job.description,
+      location: job.location,
+      compensation_amount: Number(job.compensation_amount),
+      payment_method: job.payment_method,
+      status: job.status,
+      posted_at: job.posted_at,
+      completed_at: job.completed_at,
+      provider: job.provider
+        ? {
+            id: job.provider.id,
+            full_name: job.provider.full_name,
+            profile_picture_url: job.provider.profile_picture_url,
+            average_rating: job.provider.average_rating
+              ? Number(job.provider.average_rating)
               : null,
           }
         : undefined,

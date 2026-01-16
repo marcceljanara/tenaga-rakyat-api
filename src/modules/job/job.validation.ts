@@ -9,6 +9,7 @@ export class JobValidation {
       .number()
       .positive('Kompensasi harus lebih dari 0')
       .max(999999999999, 'Kompensasi terlalu besar'),
+    payment_method: z.enum(['ESCROW_SYSTEM', 'CASH_OFFLINE']),
   });
 
   static readonly UPDATE_JOB = z.object({

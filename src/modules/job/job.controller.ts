@@ -166,13 +166,50 @@ export class JobController {
 
   /**
    * GET /api/jobs/{job_id}
-   * Melihat detail lowongan pekerjaan
-   * Role: Semua (public)
+   * Melihat detail lowongan pekerjaan Private
+   * Role: Worker (1) and Job Provider (2)
    */
-  @Get('/:jobId')
+  @Get('/:jobId/private')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Get job detail',
+    summary: 'Get job detail Private',
+    description: 'Get detailed job information (Private for Worker/Provider).',
+  })
+  @ApiParam({ name: 'jobId', type: Number, description: 'Job ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Job details retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/JobResponse' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Job not found' })
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  async getJobDetailPrivate(
+    @Param('jobId', ParseIntPipe) jobId: number,
+    @Auth() user: User,
+  ): Promise<WebResponse<JobResponse>> {
+    const result = await this.jobService.getJobDetailPrivate(
+      jobId,
+      user.id,
+      user.role_id,
+    );
+    return {
+      data: result,
+    };
+  }
+  /**
+   * GET /api/jobs/{job_id}
+   * Melihat detail lowongan pekerjaan Private
+   * Role: Public
+   */
+  @Get('/:jobId/public')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Get job detail Public',
     description: 'Get detailed job information (Public)',
   })
   @ApiParam({ name: 'jobId', type: Number, description: 'Job ID' })
@@ -187,10 +224,10 @@ export class JobController {
     },
   })
   @ApiResponse({ status: 404, description: 'Job not found' })
-  async getJobDetail(
+  async getJobDetailPublic(
     @Param('jobId', ParseIntPipe) jobId: number,
   ): Promise<WebResponse<JobResponse>> {
-    const result = await this.jobService.getJobDetail(jobId);
+    const result = await this.jobService.getJobDetailPublic(jobId);
     return {
       data: result,
     };
