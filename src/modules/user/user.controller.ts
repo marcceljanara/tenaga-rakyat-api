@@ -17,6 +17,7 @@ import {
   EditUserRequest,
   LoginUserRequest,
   RegisterUserRequest,
+  UpdateLocationRequest,
   UserResponse,
 } from '../../model/user.model';
 import { WebResponse } from '../../model/web.model';
@@ -334,6 +335,44 @@ export class UserController {
       data: response,
     };
   }
+
+  @Put('/profile/location')
+  @HttpCode(200)
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiBody({ type: UpdateLocationRequest })
+  @ApiResponse({
+    status: 200,
+    description: 'Location updated',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Location berhasil diperbarui' },
+        data: { $ref: '#/components/schemas/UserResponse' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+    schema: {
+      type: 'object',
+      properties: {
+        errors: { type: 'string', example: 'User not found' },
+      },
+    },
+  })
+  async updateLocation(
+    @Auth() user: User,
+    @Body() request: UpdateLocationRequest,
+  ): Promise<WebResponse<UserResponse>> {
+    const response = await this.userService.updateLocation(user.id, request);
+    return {
+      message: 'Location berhasil diperbarui',
+      data: response,
+    };
+  }
+
   @Post('/profile/picture')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
