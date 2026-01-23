@@ -4,18 +4,22 @@ export class JobValidation {
   static readonly CREATE_JOB = z.object({
     title: z.string().min(5, 'Judul minimal 5 karakter').max(255),
     description: z.string().min(20, 'Deskripsi minimal 20 karakter').max(5000),
-    location: z.string().max(255).optional(),
+    location_label: z.string().max(255),
+    address_detail: z.string().max(500).optional(),
     compensation_amount: z
       .number()
       .positive('Kompensasi harus lebih dari 0')
       .max(999999999999, 'Kompensasi terlalu besar'),
     payment_method: z.enum(['ESCROW_SYSTEM', 'CASH_OFFLINE']),
+    job_latitude: z.number().min(-90).max(90),
+    job_longitude: z.number().min(-180).max(180),
   });
 
   static readonly UPDATE_JOB = z.object({
     title: z.string().min(5).max(255).optional(),
     description: z.string().min(20).max(5000).optional(),
-    location: z.string().max(255).optional(),
+    location_label: z.string().max(255),
+    address_detail: z.string().max(500).optional(),
     compensation_amount: z.number().positive().max(999999999999).optional(),
   });
 

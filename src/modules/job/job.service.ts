@@ -17,6 +17,7 @@ import { JobValidation } from './job.validation';
 import { JobStatus, Prisma, WalletStatus } from '@prisma/client';
 import { dec } from '../../common/decimal.util';
 import { ROLES } from '../../common/role/role';
+import { LocationService } from '../location/location.service';
 
 @Injectable()
 export class JobService {
@@ -24,6 +25,7 @@ export class JobService {
     private validationService: ValidationService,
     @Inject(WINSTON_MODULE_PROVIDER) private logger: Logger,
     private prismaService: PrismaService,
+    private locationService: LocationService,
   ) {}
 
   async createJob(
@@ -31,7 +33,13 @@ export class JobService {
     request: CreateJobRequest,
   ): Promise<JobResponse> {
     this.logger.debug(`Creating job for provider ${providerId}`);
-
+    const isValid = this.locationService.isValidLatLon(
+      request.job_latitude,
+      request.job_longitude,
+    );
+    if (!isValid) {
+      throw new HttpException('Koordinat lokasi tidak valid', 400);
+    }
     const createRequest: CreateJobRequest = this.validationService.validate(
       JobValidation.CREATE_JOB,
       request,
@@ -76,11 +84,14 @@ export class JobService {
         provider_id: providerId,
         title: createRequest.title,
         description: createRequest.description,
-        location: createRequest.location,
+        location_label: createRequest.location_label,
+        address_detail: createRequest.address_detail,
         compensation_amount: createRequest.compensation_amount,
         status: JobStatus.OPEN,
         completed_at: new Date(), // Temporary, will be updated when completed
         payment_method: createRequest.payment_method,
+        job_latitude: createRequest.job_latitude,
+        job_longitude: createRequest.job_longitude,
       },
       include: {
         provider: {
@@ -470,6 +481,7 @@ export class JobService {
   ): Promise<JobResponse> {
     this.logger.debug(`Getting job detail ${jobId}`);
     const isAdmin = roleId == ROLES.ADMIN || roleId == ROLES.SUPER_ADMIN;
+
     const job = await this.prismaService.job.findUnique({
       where: {
         id: jobId,
@@ -496,6 +508,8 @@ export class JobService {
             average_rating: true,
             phone_number: true,
             email: true,
+            latitude: true,
+            longitude: true,
           },
         },
         _count: {
@@ -510,10 +524,70 @@ export class JobService {
       throw new HttpException('Lowongan tidak ditemukan', 404);
     }
 
-    return this.mapToJobResponsePrivate(job);
+    let distance: number | null = null;
+
+    // Jika yang mengakses adalah provider/employer
+    if (job.provider_id === userId) {
+      // Hitung jarak worker ke lokasi kerja (jika worker sudah assigned)
+      if (job.worker && job.worker.latitude && job.worker.longitude) {
+        distance = this.locationService.distanceKm(
+          job.worker.latitude.toNumber(),
+          job.worker.longitude.toNumber(),
+          job.job_latitude.toNumber(),
+          job.job_longitude.toNumber(),
+        );
+      }
+    } else {
+      // Jika yang mengakses adalah worker
+      // Ambil lokasi user (worker)
+      const user = await this.prismaService.user.findUnique({
+        where: {
+          id: userId,
+        },
+        select: {
+          latitude: true,
+          longitude: true,
+        },
+      });
+
+      if (!user) {
+        throw new HttpException('User tidak ditemukan', 404);
+      }
+
+      // Hitung jarak dari lokasi worker ke lokasi kerja
+      if (user.latitude && user.longitude) {
+        distance = this.locationService.distanceKm(
+          user.latitude.toNumber(),
+          user.longitude.toNumber(),
+          job.job_latitude.toNumber(),
+          job.job_longitude.toNumber(),
+        );
+      }
+    }
+
+    return this.mapToJobResponsePrivate({ ...job, distance });
   }
-  async getJobDetailPublic(jobId: number): Promise<JobResponse> {
+  async getJobDetailPublic(
+    jobId: number,
+    userId: string,
+  ): Promise<JobResponse> {
     this.logger.debug(`Getting job detail ${jobId}`);
+
+    // Ambil user location jika ada
+    const user = await this.prismaService.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        latitude: true,
+        longitude: true,
+      },
+    });
+
+    if (!user) {
+      throw new HttpException('User tidak ditemukan', 404);
+    }
+
     const job = await this.prismaService.job.findUnique({
       where: {
         id: jobId,
@@ -539,7 +613,14 @@ export class JobService {
       throw new HttpException('Lowongan tidak ditemukan', 404);
     }
 
-    return this.mapToJobResponsePrivate(job);
+    const distance = this.locationService.distanceKm(
+      user.latitude!.toNumber(),
+      user.longitude!.toNumber(),
+      job.job_latitude.toNumber(),
+      job.job_longitude.toNumber(),
+    );
+
+    return this.mapToJobResponsePublic({ ...job, distance });
   }
 
   async searchJobs(query: JobSearchQuery): Promise<JobListResponse> {
@@ -793,7 +874,8 @@ export class JobService {
       worker_id: job.worker_id,
       title: job.title,
       description: job.description,
-      location: job.location,
+      location_label: job.location_label,
+      address_detail: job.address_detail,
       compensation_amount: Number(job.compensation_amount),
       payment_method: job.payment_method,
       status: job.status,
@@ -811,6 +893,7 @@ export class JobService {
             email: job.provider.email,
           }
         : undefined,
+      distance: job.distance,
       worker: job.worker
         ? {
             id: job.worker.id,
@@ -832,7 +915,7 @@ export class JobService {
       worker_id: job.worker_id,
       title: job.title,
       description: job.description,
-      location: job.location,
+      location_label: job.location_label,
       compensation_amount: Number(job.compensation_amount),
       payment_method: job.payment_method,
       status: job.status,
@@ -848,6 +931,7 @@ export class JobService {
               : null,
           }
         : undefined,
+      distance: job.distance,
       _count: job._count
         ? {
             jobApplications: job._count.jobApplications,

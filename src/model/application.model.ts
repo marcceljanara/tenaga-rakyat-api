@@ -43,7 +43,7 @@ export class ApplicationResponse {
     id: number;
     title: string;
     description: string;
-    location: string | null;
+    location_label: string | null;
     compensation_amount: number;
     status: string;
     payment_method: string;
@@ -67,6 +67,7 @@ export class ApplicationResponse {
     average_rating: number | null;
     verification_status: string;
   };
+  distance?: number;
 }
 
 export class ApplicationListResponse {
