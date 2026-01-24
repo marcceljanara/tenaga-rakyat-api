@@ -879,6 +879,8 @@ export class JobService {
       description: job.description,
       location_label: job.location_label,
       address_detail: job.address_detail,
+      job_latitude: job.job_latitude,
+      job_longitude: job.job_longitude,
       compensation_amount: Number(job.compensation_amount),
       payment_method: job.payment_method,
       status: job.status,

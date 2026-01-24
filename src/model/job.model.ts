@@ -94,6 +94,12 @@ export class JobResponse {
   @ApiPropertyOptional()
   address_detail?: string | null;
 
+  @ApiPropertyOptional()
+  job_latitude?: number | null;
+
+  @ApiPropertyOptional()
+  job_longitude?: number | null;
+
   @ApiProperty()
   compensation_amount: number;
 
