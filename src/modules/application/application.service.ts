@@ -817,6 +817,8 @@ export class ApplicationService {
             cv_url: true,
             average_rating: true,
             verification_status: true,
+            latitude: true,
+            longitude: true,
           },
         },
       },
@@ -834,7 +836,14 @@ export class ApplicationService {
       throw new HttpException('Anda tidak memiliki akses ke lamaran ini', 403);
     }
 
-    return this.mapToApplicationResponse(application);
+    const distance = this.locationService.distanceKm(
+      application.worker?.latitude?.toNumber() || 0,
+      application.worker?.longitude?.toNumber() || 0,
+      application.job.job_latitude?.toNumber() || 0,
+      application.job.job_longitude?.toNumber() || 0,
+    );
+
+    return this.mapToApplicationResponse({ ...application, distance });
   }
 
   private mapToApplicationResponse(application: any): ApplicationResponse {
@@ -853,6 +862,9 @@ export class ApplicationService {
               title: String(application.job.title),
               description: String(application.job.description),
               location_label: application.job.location_label,
+              address_detail: application.job.address_detail,
+              job_latitude: application.job.job_latitude,
+              job_longitude: application.job.job_longitude,
               compensation_amount: Number(application.job.compensation_amount),
               payment_method: application.job.payment_method,
               status: String(application.job.status),

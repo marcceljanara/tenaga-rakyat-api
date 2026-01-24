@@ -44,6 +44,9 @@ export class ApplicationResponse {
     title: string;
     description: string;
     location_label: string | null;
+    address_detail?: string | null;
+    job_latitude?: number | null;
+    job_longitude?: number | null;
     compensation_amount: number;
     status: string;
     payment_method: string;
