@@ -613,9 +613,12 @@ export class JobService {
       throw new HttpException('Lowongan tidak ditemukan', 404);
     }
 
+    if (!user.latitude || !user.longitude) {
+      return this.mapToJobResponsePublic({ ...job, distance: null });
+    }
     const distance = this.locationService.distanceKm(
-      user.latitude!.toNumber(),
-      user.longitude!.toNumber(),
+      user.latitude.toNumber(),
+      user.longitude.toNumber(),
       job.job_latitude.toNumber(),
       job.job_longitude.toNumber(),
     );
