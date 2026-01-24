@@ -7,7 +7,13 @@ import {
   ReportDashboardSummaryResponse,
   ReportDateRangeRequest,
 } from '../../model/report.model';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 
 @ApiTags('Admin - Reports')
 @ApiBearerAuth()
@@ -18,22 +24,36 @@ export class ReportController {
   @Get('/dashboard-summary')
   @HttpCode(200)
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
-  @ApiOperation({ 
-    summary: 'Get dashboard summary', 
-    description: 'Get financial summary for admin dashboard. Includes total inflow (FUNDING), total outflow (WITHDRAWAL + ESCROW_RELEASE), platform fees, platform balance, escrow held, and pending withdrawals. Default date range: first day of current month to today.' 
+  @ApiOperation({
+    summary: 'Get dashboard summary',
+    description:
+      'Get financial summary for admin dashboard. Includes total inflow (FUNDING), total outflow (WITHDRAWAL + ESCROW_RELEASE), platform fees, platform balance, escrow held, and pending withdrawals. Default date range: first day of current month to today.',
   })
-  @ApiQuery({ name: 'from', required: false, type: String, description: 'Start date (ISO format). Default: first day of current month' })
-  @ApiQuery({ name: 'to', required: false, type: String, description: 'End date (ISO format). Default: today' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    type: String,
+    description: 'Start date (ISO format). Default: first day of current month',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    type: String,
+    description: 'End date (ISO format). Default: today',
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Dashboard summary retrieved',
     schema: {
       type: 'object',
       properties: {
-        message: { type: 'string', example: 'Dashboard summary fetched successfully' },
-        data: { $ref: '#/components/schemas/ReportDashboardSummaryResponse' }
-      }
-    }
+        message: {
+          type: 'string',
+          example: 'Dashboard summary fetched successfully',
+        },
+        data: { $ref: '#/components/schemas/ReportDashboardSummaryResponse' },
+      },
+    },
   })
   async getDashboardSummary(
     @Query('from') from?: string,

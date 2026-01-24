@@ -9,6 +9,7 @@ import {
   LoginUserRequest,
   LoginUserResponse,
   RegisterUserRequest,
+  UpdateLocationRequest,
   UserResponse,
 } from '../../model/user.model';
 import { UserValidation } from './user.validation';
@@ -17,6 +18,7 @@ import { addDays } from 'date-fns';
 import { randomUUID } from 'crypto';
 import { Prisma, VerificationPurpose } from '@prisma/client';
 import { EmailVerificationService } from '../auth/email-verification.service';
+import { LocationService } from '../location/location.service';
 
 @Injectable()
 export class UserService {
@@ -26,6 +28,7 @@ export class UserService {
     private prismaService: PrismaService,
     private jwt: JwtService,
     private emailVerificationService: EmailVerificationService,
+    private locationService: LocationService,
   ) {}
 
   async register(request: RegisterUserRequest): Promise<UserResponse> {
@@ -261,6 +264,43 @@ export class UserService {
     return this.toUserResponse(user);
   }
 
+  async updateLocation(
+    userId: string,
+    request: UpdateLocationRequest,
+  ): Promise<UserResponse> {
+    this.logger.debug(
+      `User ID: ${userId} - Lat: ${request.latitude} - Lon: ${request.longitude}`,
+    );
+    const isValid = this.locationService.isValidLatLon(
+      request.latitude,
+      request.longitude,
+    );
+    if (!isValid) {
+      throw new HttpException('Invalid Latitude or Longitude', 400);
+    }
+    const user = await this.prismaService.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        latitude: request.latitude,
+        longitude: request.longitude,
+      },
+      include: {
+        role: true,
+        user_photos: {
+          orderBy: {
+            created_at: 'desc',
+          },
+        },
+      },
+    });
+    if (!user) {
+      throw new HttpException('User not found', 404);
+    }
+    return this.toUserResponse(user);
+  }
+
   toUserResponse(
     response: Prisma.UserGetPayload<{
       include: {
@@ -278,6 +318,9 @@ export class UserService {
       average_rating: response.average_rating?.toNumber(),
       profile_picture_url: response.profile_picture_url,
       verification_status: response.verification_status,
+      location_label: response.location_label,
+      latitude: response.latitude?.toNumber(),
+      longitude: response.longitude?.toNumber(),
       about: response.about,
       cv_url: response.cv_url,
       photos: response.user_photos?.map((photo) => ({

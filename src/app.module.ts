@@ -12,6 +12,7 @@ import { UserManagementModule } from './modules/user-management/user-management.
 import { AdminModule } from './modules/admin/admin.module';
 import { ReportModule } from './modules/report/report.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { LocationModule } from './modules/location/location.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { AuthModule } from './modules/auth/auth.module';
     AdminModule,
     ReportModule,
     AuthModule,
+    LocationModule,
   ],
   controllers: [],
   providers: [CronService],

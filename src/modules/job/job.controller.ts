@@ -224,10 +224,12 @@ export class JobController {
     },
   })
   @ApiResponse({ status: 404, description: 'Job not found' })
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   async getJobDetailPublic(
+    @Auth() user: User,
     @Param('jobId', ParseIntPipe) jobId: number,
   ): Promise<WebResponse<JobResponse>> {
-    const result = await this.jobService.getJobDetailPublic(jobId);
+    const result = await this.jobService.getJobDetailPublic(jobId, user.id);
     return {
       data: result,
     };

@@ -71,16 +71,10 @@ export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(AuthMiddleware)
-      .exclude(
-        {
-          path: '/api/jobs/:jobId/public',
-          method: RequestMethod.GET,
-        },
-        {
-          path: '/api/jobs',
-          method: RequestMethod.GET,
-        },
-      )
+      .exclude({
+        path: '/api/jobs',
+        method: RequestMethod.GET,
+      })
       .forRoutes(
         '/api/users/profile',
         '/api/users/profile/*',

@@ -19,7 +19,8 @@ import {
   Prisma,
   WalletStatus,
 } from '@prisma/client';
-import { ROLES } from 'src/common/role/role';
+import { ROLES } from '../../common/role/role';
+import { LocationService } from '../location/location.service';
 
 @Injectable()
 export class ApplicationService {
@@ -27,6 +28,7 @@ export class ApplicationService {
     private validationService: ValidationService,
     @Inject(WINSTON_MODULE_PROVIDER) private logger: Logger,
     private prismaService: PrismaService,
+    private locationService: LocationService,
   ) {}
 
   async applyJob(
@@ -192,6 +194,8 @@ export class ApplicationService {
               cv_url: true,
               average_rating: true,
               verification_status: true,
+              latitude: true,
+              longitude: true,
             },
           },
         },
@@ -199,8 +203,34 @@ export class ApplicationService {
       this.prismaService.jobApplication.count({ where }),
     ]);
 
+    // Kalkulasi jarak untuk setiap application
+    const applicationsWithDistance = applications.map((app) => {
+      let distance: number | null = null;
+
+      // Hitung jarak jika worker memiliki koordinat lokasi
+      if (
+        app.worker &&
+        app.worker.latitude &&
+        app.worker.longitude &&
+        job.job_latitude &&
+        job.job_longitude
+      ) {
+        distance = this.locationService.distanceKm(
+          app.worker.latitude.toNumber(),
+          app.worker.longitude.toNumber(),
+          job.job_latitude.toNumber(),
+          job.job_longitude.toNumber(),
+        );
+      }
+
+      return {
+        ...app,
+        distance,
+      };
+    });
+
     return {
-      applications: applications.map((app) =>
+      applications: applicationsWithDistance.map((app) =>
         this.mapToApplicationResponse(app),
       ),
       total,
@@ -787,6 +817,8 @@ export class ApplicationService {
             cv_url: true,
             average_rating: true,
             verification_status: true,
+            latitude: true,
+            longitude: true,
           },
         },
       },
@@ -804,7 +836,14 @@ export class ApplicationService {
       throw new HttpException('Anda tidak memiliki akses ke lamaran ini', 403);
     }
 
-    return this.mapToApplicationResponse(application);
+    const distance = this.locationService.distanceKm(
+      application.worker?.latitude?.toNumber() || 0,
+      application.worker?.longitude?.toNumber() || 0,
+      application.job.job_latitude?.toNumber() || 0,
+      application.job.job_longitude?.toNumber() || 0,
+    );
+
+    return this.mapToApplicationResponse({ ...application, distance });
   }
 
   private mapToApplicationResponse(application: any): ApplicationResponse {
@@ -822,7 +861,10 @@ export class ApplicationService {
               id: Number(application.job.id),
               title: String(application.job.title),
               description: String(application.job.description),
-              location: application.job.location,
+              location_label: application.job.location_label,
+              address_detail: application.job.address_detail,
+              job_latitude: application.job.job_latitude,
+              job_longitude: application.job.job_longitude,
               compensation_amount: Number(application.job.compensation_amount),
               payment_method: application.job.payment_method,
               status: String(application.job.status),
@@ -852,6 +894,7 @@ export class ApplicationService {
             verification_status: application.worker.verification_status,
           }
         : undefined,
+      distance: application.distance,
     };
   }
 }

@@ -30,6 +30,7 @@ export class TestService {
         },
       },
     });
+    await this.prismaService.platformTransaction.deleteMany();
   }
 
   async addUser() {

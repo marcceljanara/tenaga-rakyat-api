@@ -11,7 +11,14 @@ export class CreateJobRequest {
   description: string;
 
   @ApiPropertyOptional({ example: 'Jakarta', description: 'Job location' })
-  location?: string;
+  location_label: string;
+
+  @ApiPropertyOptional({
+    example:
+      'Jalan Kenangan, RT 01/RW 012, Desa Suka Makmur, Kecamatan Asik-Asik',
+    description: 'Job address detail',
+  })
+  address_detail?: string;
 
   @ApiProperty({ example: 5000000, description: 'Compensation amount in IDR' })
   compensation_amount: number;
@@ -21,6 +28,12 @@ export class CreateJobRequest {
     example: 'ESCROW_SYSTEM',
   })
   payment_method: 'ESCROW_SYSTEM' | 'CASH_OFFLINE';
+
+  @ApiProperty()
+  job_latitude: number;
+
+  @ApiProperty()
+  job_longitude: number;
 }
 
 export class UpdateJobRequest {
@@ -36,8 +49,8 @@ export class UpdateJobRequest {
   })
   description?: string;
 
-  @ApiPropertyOptional({ example: 'Bandung', description: 'Updated location' })
-  location?: string;
+  @ApiPropertyOptional({ example: 'Jakarta', description: 'Job location' })
+  location_label: string;
 
   @ApiPropertyOptional({
     example: 6000000,
@@ -76,7 +89,16 @@ export class JobResponse {
   description: string;
 
   @ApiPropertyOptional()
-  location: string | null;
+  location_label: string | null;
+
+  @ApiPropertyOptional()
+  address_detail?: string | null;
+
+  @ApiPropertyOptional()
+  job_latitude?: number | null;
+
+  @ApiPropertyOptional()
+  job_longitude?: number | null;
 
   @ApiProperty()
   compensation_amount: number;
@@ -112,6 +134,8 @@ export class JobResponse {
     phone_number: string;
     email: string;
   };
+
+  distance?: number | null;
 
   @ApiPropertyOptional()
   _count?: {
