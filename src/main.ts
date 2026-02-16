@@ -7,15 +7,16 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({
     origin: 'http://localhost:5173',
-    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
-  })
+  });
   app.use(cookieParser());
 
-    // Swagger Configuration
-    const config = new DocumentBuilder()
+  // Swagger Configuration
+  const config = new DocumentBuilder()
     .setTitle('Job Platform API')
-    .setDescription(`
+    .setDescription(
+      `
 # Job Platform REST API Documentation
 
 Dokumentasi lengkap untuk Job Platform API yang menyediakan layanan untuk manajemen pekerjaan, lamaran kerja, wallet, dan pembayaran.
@@ -54,13 +55,10 @@ Success response mengikuti format:
   "message": "Success message (optional)"
 }
 \`\`\`
-    `)
-    .setVersion('1.0')
-    .setContact(
-      'Developer Team',
-      'https://example.com',
-      'support@example.com'
+    `,
     )
+    .setVersion('1.0')
+    .setContact('Developer Team', 'https://example.com', 'support@example.com')
     .setLicense('MIT', 'https://opensource.org/licenses/MIT')
     .addBearerAuth(
       {
@@ -73,14 +71,32 @@ Success response mengikuti format:
       },
       'JWT-auth', // This name here is important for matching with @ApiBearerAuth() in controllers
     )
-    .addTag('User Authentication & Profile', 'Endpoints untuk registrasi, login, dan manajemen profil pengguna')
-    .addTag('Authentication & Email Verification', 'Endpoints untuk verifikasi email dan reset password')
+    .addTag(
+      'User Authentication & Profile',
+      'Endpoints untuk registrasi, login, dan manajemen profil pengguna',
+    )
+    .addTag(
+      'Authentication & Email Verification',
+      'Endpoints untuk verifikasi email dan reset password',
+    )
     .addTag('Job Management', 'Endpoints untuk manajemen lowongan pekerjaan')
     .addTag('Job Applications', 'Endpoints untuk manajemen lamaran pekerjaan')
-    .addTag('Payment & Wallet', 'Endpoints untuk manajemen wallet dan transaksi')
-    .addTag('Withdraw Methods', 'Endpoints untuk manajemen metode penarikan dana')
-    .addTag('Withdraw Requests - User', 'Endpoints untuk user mengelola permintaan penarikan')
-    .addTag('Admin - Withdraw Management', 'Endpoints untuk admin mengelola withdraw requests')
+    .addTag(
+      'Payment & Wallet',
+      'Endpoints untuk manajemen wallet dan transaksi',
+    )
+    .addTag(
+      'Withdraw Methods',
+      'Endpoints untuk manajemen metode penarikan dana',
+    )
+    .addTag(
+      'Withdraw Requests - User',
+      'Endpoints untuk user mengelola permintaan penarikan',
+    )
+    .addTag(
+      'Admin - Withdraw Management',
+      'Endpoints untuk admin mengelola withdraw requests',
+    )
     .addTag('Admin Management', 'Endpoints untuk manajemen akun admin')
     .addTag('Admin - User Management', 'Endpoints untuk admin mengelola user')
     .addTag('Admin - Reports', 'Endpoints untuk laporan dan statistik platform')
