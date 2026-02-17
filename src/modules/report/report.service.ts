@@ -6,8 +6,9 @@ import { PrismaService } from '../../common/prisma.service';
 import {
   ReportDashboardSummaryResponse,
   ReportDateRangeRequest,
+  ReportTimeseriesItem,
+  TimeseriesGranularity,
 } from '../../model/report.model';
-import { dec } from '../../common/decimal.util';
 import { ReportValidation } from './report.validation';
 
 @Injectable()
@@ -18,113 +19,140 @@ export class ReportService {
     private prismaService: PrismaService,
   ) {}
 
-  async dashboardSummary(
-    query: ReportDateRangeRequest,
+  async getDashboardSummary(
+    granularity: TimeseriesGranularity,
   ): Promise<ReportDashboardSummaryResponse> {
-    const validatedQuery = this.validationService.validate(
-      ReportValidation.DATE_RANGE,
-      query,
+    this.validationService.validate(ReportValidation.DASHBOARD_SUMMARY, {
+      granularity,
+    });
+
+    this.logger.info(
+      `Fetching dashboard summary with granularity: ${granularity}`,
     );
-    const [
-      inflowAgg,
-      outflowAgg,
-      platformFeeAgg,
-      platformWallet,
-      escrowAgg,
-      withdrawAgg,
-    ] = await this.prismaService.$transaction([
-      // 1. Total Inflow (FUNDING)
-      this.prismaService.transaction.aggregate({
-        _sum: {
-          amount: true,
-        },
-        where: {
-          transaction_type: 'FUNDING',
-          status: 'COMPLETED',
-          created_at: {
-            gte: validatedQuery.from,
-            lte: validatedQuery.to,
-          },
-        },
-      }),
 
-      // 2. Total Outflow (WITHDRAWAL + ESCROW_RELEASE)
-      this.prismaService.transaction.aggregate({
-        _sum: {
-          amount: true,
-        },
-        where: {
-          transaction_type: {
-            in: ['WITHDRAWAL', 'ESCROW_RELEASE'],
-          },
-          status: 'COMPLETED',
-          created_at: {
-            gte: validatedQuery.from,
-            lte: validatedQuery.to,
-          },
-        },
-      }),
+    const [aggregates, timeseries] = await Promise.all([
+      this.getAggregates(),
+      this.getTimeseries(granularity),
+    ]);
 
-      // 3. Platform Fees (semua fee platform)
-      this.prismaService.platformTransaction.aggregate({
-        _sum: {
-          amount: true,
-        },
-        where: {
-          created_at: {
-            gte: validatedQuery.from,
-            lte: validatedQuery.to,
-          },
-        },
-      }),
+    return { ...aggregates, timeseries };
+  }
 
-      // 4. Platform Wallet (saldo terkini)
-      this.prismaService.platformWallet.findFirst({
-        orderBy: {
-          id: 'desc',
-        },
-      }),
+  async exportCsv(request: ReportDateRangeRequest): Promise<string> {
+    const validated = this.validationService.validate(
+      ReportValidation.DATE_RANGE,
+      request,
+    );
 
-      // 5. Escrow Held
-      this.prismaService.escrow.aggregate({
-        _sum: {
-          amount: true,
-        },
-        where: {
-          status: 'HELD',
-        },
-      }),
+    this.logger.info(
+      `Exporting CSV from ${validated.from.toISOString()} to ${validated.to.toISOString()}`,
+    );
 
-      // 6. Withdraw Pending + Processing
-      this.prismaService.withdrawRequest.aggregate({
-        _sum: {
-          amount: true,
-        },
-        where: {
-          status: {
-            in: ['PENDING', 'PROCESSING'],
-          },
-          created_at: {
-            gte: validatedQuery.from,
-            lte: validatedQuery.to,
-          },
-        },
+    const purchases = await this.prismaService.postingCreditPurchase.findMany({
+      where: {
+        status: 'PAID',
+        paid_at: { gte: validated.from, lte: validated.to },
+      },
+      include: { package: true, user: true },
+      orderBy: { paid_at: 'asc' },
+    });
+
+    return this.buildCsv(purchases);
+  }
+
+  private async getAggregates(): Promise<
+    Omit<ReportDashboardSummaryResponse, 'timeseries'>
+  > {
+    const [paid, pending, failed] = await Promise.all([
+      this.prismaService.postingCreditPurchase.aggregate({
+        where: { status: 'PAID' },
+        _count: true,
+        _sum: { total_price: true, credit_amount: true },
+      }),
+      this.prismaService.postingCreditPurchase.count({
+        where: { status: 'PENDING' },
+      }),
+      this.prismaService.postingCreditPurchase.count({
+        where: { status: { in: ['EXPIRED', 'FAILED'] } },
       }),
     ]);
 
     return {
-      period: {
-        from: validatedQuery.from,
-        to: validatedQuery.to,
-      },
-      summary: {
-        total_inflow: inflowAgg._sum.amount ?? dec(0),
-        total_outflow: outflowAgg._sum.amount ?? dec(0),
-        platform_fees: platformFeeAgg._sum.amount ?? dec(0),
-        platform_balance: platformWallet?.balance ?? dec(0),
-        escrow_held: escrowAgg._sum.amount ?? dec(0),
-        withdraw_pending: withdrawAgg._sum.amount ?? dec(0),
-      },
+      total_transactions: paid._count + pending + failed,
+      total_revenue: Number(paid._sum.total_price ?? 0),
+      total_credits_sold: paid._sum.credit_amount ?? 0,
+      paid_transactions: paid._count,
+      pending_transactions: pending,
+      failed_transactions: failed,
     };
+  }
+
+  private async getTimeseries(
+    granularity: TimeseriesGranularity,
+  ): Promise<ReportTimeseriesItem[]> {
+    // PostgreSQL uses TO_CHAR; format strings differ per granularity
+    const formatMap: Record<TimeseriesGranularity, string> = {
+      daily: 'YYYY-MM-DD',
+      weekly: 'IYYY-IW', // ISO year + ISO week number
+      monthly: 'YYYY-MM',
+      yearly: 'YYYY',
+    };
+
+    const format = formatMap[granularity];
+
+    const rows: Array<{
+      period: string;
+      total_transactions: bigint;
+      total_revenue: string;
+      total_credits: bigint;
+    }> = await this.prismaService.$queryRaw`
+      SELECT
+        TO_CHAR(paid_at, ${format})                 AS period,
+        COUNT(*)::bigint                            AS total_transactions,
+        COALESCE(SUM(total_price), 0)::text         AS total_revenue,
+        COALESCE(SUM(credit_amount), 0)::bigint     AS total_credits
+      FROM posting_credit_purchase
+      WHERE status = 'PAID'
+        AND paid_at IS NOT NULL
+      GROUP BY period
+      ORDER BY period ASC
+    `;
+
+    return rows.map((row) => ({
+      period: row.period,
+      total_transactions: Number(row.total_transactions),
+      total_revenue: Number(row.total_revenue),
+      total_credits: Number(row.total_credits),
+    }));
+  }
+
+  private buildCsv(purchases: any[]): string {
+    const header = [
+      'ID',
+      'User ID',
+      'Package Name',
+      'Credit Amount',
+      'Total Price',
+      'Payment Reference',
+      'Status',
+      'Paid At',
+      'Created At',
+    ].join(',');
+
+    const rows = purchases.map((p) =>
+      [
+        p.id,
+        p.user_id,
+        `"${p.package?.name ?? ''}"`,
+        p.credit_amount,
+        p.total_price,
+        p.payment_reference,
+        p.status,
+        p.paid_at?.toISOString() ?? '',
+        p.created_at.toISOString(),
+      ].join(','),
+    );
+
+    return [header, ...rows].join('\n');
   }
 }
