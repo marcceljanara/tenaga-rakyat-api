@@ -78,6 +78,48 @@ export class JobService {
       );
     }
 
+    // Transaksi buat job
+    await this.prismaService.$transaction(async (tx) => {
+      const credit = await tx.userPostingQuota.findUnique({
+        where: {
+          user_id: providerId,
+        },
+      });
+
+      if (!credit) {
+        throw new HttpException('Credit tidak ditemukan', 404);
+      }
+
+      if (credit.free_quota > 0) {
+        await tx.userPostingQuota.update({
+          where: {
+            user_id: providerId,
+          },
+          data: {
+            free_quota: {
+              decrement: 1,
+            },
+          },
+        });
+      } else if (credit.paid_credit > 0) {
+        await tx.userPostingQuota.update({
+          where: {
+            user_id: providerId,
+          },
+          data: {
+            paid_credit: {
+              decrement: 1,
+            },
+          },
+        });
+      } else {
+        throw new HttpException(
+          'Credit tidak mencukupi untuk melakukan posting, silahkan isi ulang kredit Rp5000',
+          400,
+        );
+      }
+    });
+
     // Buat job
     const job = await this.prismaService.job.create({
       data: {
