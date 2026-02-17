@@ -7,6 +7,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { PaymentService } from './payment.service';
@@ -16,16 +17,23 @@ import { Auth } from '../../common/auth/auth.decorator';
 import type { User } from '@prisma/client';
 import {
   AddBalanceWalletInitRequest,
+  AddPostinCreditPackageRequest,
   AddWithdrawMethodRequest,
   ApproveWithdrawRequest,
   CreateWithdrawRequestRequest,
+  CreditBalanceResponse,
+  EditPostingCreditPackageRequest,
+  ListPostingPackageResponse,
   ListWithdrawMethodResponse,
   ListWithdrawRequestResponse,
   LockWithdrawRequest,
+  PostingCreditPurchaseResponse,
+  PostingPackageResponse,
   RejectWithdrawRequest,
   SendWithdrawRequest,
   TopupCallbackRequest,
-  TopupWalletRequest,
+  TopupCreditRequest,
+  // TopupWalletRequest,
   TransactionListResponse,
   WalletResponse,
   WithdrawMethodReadyToPay,
@@ -47,6 +55,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
+import { PaginationQueryDto } from '../../common/pagination.dto';
 
 @ApiTags('Payment & Wallet')
 @Controller('/api')
@@ -88,75 +97,75 @@ export class PaymentController {
     };
   }
 
-  @Post('/wallets/topup')
-  @HttpCode(200)
-  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA])
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Top up wallet',
-    description: 'Create top-up transaction via Midtrans (minimum: 10,000)',
-  })
-  @ApiBody({ type: TopupWalletRequest })
-  @ApiResponse({
-    status: 200,
-    description:
-      'Payment link created. Returns Midtrans snap token and redirect URL.',
-    schema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string', example: 'Silahkan selesaikan pembayaran' },
-        data: {
-          type: 'object',
-          properties: {
-            token: { type: 'string', example: 'snap-token-here' },
-            redirect_url: {
-              type: 'string',
-              example: 'https://app.midtrans.com/snap/v2/...',
-            },
-          },
-        },
-      },
-    },
-  })
-  @ApiResponse({ status: 404, description: 'Wallet not found' })
-  async topupWallet(
-    @Auth() user: User,
-    @Body() request: TopupWalletRequest,
-  ): Promise<WebResponse<any>> {
-    const result = await this.paymentService.createTopupTransaction(
-      request,
-      user,
-    );
+  // @Post('/wallets/topup')
+  // @HttpCode(200)
+  // @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA])
+  // @ApiBearerAuth()
+  // @ApiOperation({
+  //   summary: 'Top up wallet',
+  //   description: 'Create top-up transaction via Midtrans (minimum: 10,000)',
+  // })
+  // @ApiBody({ type: TopupWalletRequest })
+  // @ApiResponse({
+  //   status: 200,
+  //   description:
+  //     'Payment link created. Returns Midtrans snap token and redirect URL.',
+  //   schema: {
+  //     type: 'object',
+  //     properties: {
+  //       message: { type: 'string', example: 'Silahkan selesaikan pembayaran' },
+  //       data: {
+  //         type: 'object',
+  //         properties: {
+  //           token: { type: 'string', example: 'snap-token-here' },
+  //           redirect_url: {
+  //             type: 'string',
+  //             example: 'https://app.midtrans.com/snap/v2/...',
+  //           },
+  //         },
+  //       },
+  //     },
+  //   },
+  // })
+  // @ApiResponse({ status: 404, description: 'Wallet not found' })
+  // async topupWallet(
+  //   @Auth() user: User,
+  //   @Body() request: TopupWalletRequest,
+  // ): Promise<WebResponse<any>> {
+  //   const result = await this.paymentService.createTopupTransaction(
+  //     request,
+  //     user,
+  //   );
 
-    return {
-      message: 'Silahkan selesaikan pembayaran',
-      data: result,
-    };
-  }
+  //   return {
+  //     message: 'Silahkan selesaikan pembayaran',
+  //     data: result,
+  //   };
+  // }
 
-  @Post('/webhook/midtrans')
-  @HttpCode(200)
-  @ApiOperation({
-    summary: 'Midtrans webhook',
-    description: 'Handle Midtrans payment callback (Midtrans only)',
-  })
-  @ApiBody({ type: TopupCallbackRequest })
-  @ApiResponse({
-    status: 200,
-    description: 'Callback processed',
-    schema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string', example: 'OK' },
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Invalid signature' })
-  async midtransCallback(@Body() body: TopupCallbackRequest) {
-    console.log('Midtrans callback received:', body);
-    await this.paymentService.handleCallback(body);
-    return { message: 'OK' };
-  }
+  // @Post('/webhook/midtrans')
+  // @HttpCode(200)
+  // @ApiOperation({
+  //   summary: 'Midtrans webhook',
+  //   description: 'Handle Midtrans payment callback (Midtrans only)',
+  // })
+  // @ApiBody({ type: TopupCallbackRequest })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'Callback processed',
+  //   schema: {
+  //     type: 'object',
+  //     properties: {
+  //       message: { type: 'string', example: 'OK' },
+  //     },
+  //   },
+  // })
+  // @ApiResponse({ status: 401, description: 'Invalid signature' })
+  // async midtransCallback(@Body() body: TopupCallbackRequest) {
+  //   console.log('Midtrans callback received:', body);
+  //   await this.paymentService.handleCallback(body);
+  //   return { message: 'OK' };
+  // }
 
   @Get('/wallets')
   @HttpCode(200)
@@ -744,5 +753,128 @@ export class PaymentController {
     return {
       message: 'Withdraw sent successfully',
     };
+  }
+
+  @Post('/admin/posting-credit')
+  @HttpCode(201)
+  @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  async createPostingCreditPackage(
+    @Auth() admin: User,
+    @Body() request: AddPostinCreditPackageRequest,
+  ): Promise<WebResponse<PostingPackageResponse>> {
+    const result = await this.paymentService.addPostingCreditPackage(request);
+    return {
+      data: result,
+      message: 'Paket Kredit Posting berhasil ditambahkan',
+    };
+  }
+
+  @Get('/admin/posting-credit')
+  @HttpCode(200)
+  @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  async getPostingCreditPackages(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    @Auth() admin: User,
+  ): Promise<WebResponse<ListPostingPackageResponse>> {
+    const result = await this.paymentService.getPostingCreditPackages();
+    return {
+      data: result,
+    };
+  }
+
+  @Put('/admin/posting-credit/:id')
+  @HttpCode(200)
+  @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  async editPostingCreditPackageById(
+    @Auth() admin: User,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() request: EditPostingCreditPackageRequest,
+  ): Promise<WebResponse<PostingPackageResponse>> {
+    const result = await this.paymentService.editPostingCreditPackageById(
+      id,
+      request,
+    );
+    return {
+      data: result,
+      message: `Data id ${id} berhasil diubah`,
+    };
+  }
+
+  @Delete('/admin/posting-credit/:id')
+  @HttpCode(200)
+  @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  async deletePostingCreditPackageById(
+    @Auth() admin: User,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<WebResponse<string>> {
+    const result = await this.paymentService.deletePostingCreditPackage(id);
+    return {
+      message: result,
+    };
+  }
+
+  @Get('/credits')
+  @HttpCode(200)
+  @Roles([ROLES.PEMBERI_KERJA])
+  async getCreditByUserId(
+    @Auth() user: User,
+  ): Promise<WebResponse<CreditBalanceResponse>> {
+    const result = await this.paymentService.getCredit(user.id);
+    return {
+      data: result,
+    };
+  }
+
+  @Get('/credits/posting-credit')
+  @HttpCode(200)
+  @Roles([ROLES.PEMBERI_KERJA])
+  async getPostingCreditPackagesGeneral(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    @Auth() admin: User,
+  ): Promise<WebResponse<ListPostingPackageResponse>> {
+    const result = await this.paymentService.getPostingCreditPackagesGeneral();
+    return {
+      data: result,
+    };
+  }
+
+  @Post('/credits/topup')
+  @HttpCode(200)
+  @Roles([ROLES.PEMBERI_KERJA])
+  async topupCredit(
+    @Auth() user: User,
+    @Body() request: TopupCreditRequest,
+  ): Promise<WebResponse<any>> {
+    const result = await this.paymentService.createTopupCreditTransaction(
+      request,
+      user,
+    );
+
+    return {
+      message: 'Silahkan selesaikan pembayaran kredit posting',
+      data: result,
+    };
+  }
+
+  @Post('/webhook/midtrans')
+  @HttpCode(200)
+  async midtransCreditCallback(@Body() body: TopupCallbackRequest) {
+    console.log('Midtrans callback received:', body);
+    await this.paymentService.handleCallbackCredit(body);
+    return { message: 'OK' };
+  }
+
+  @Get('/credits/history')
+  @HttpCode(200)
+  @Roles([ROLES.PEMBERI_KERJA])
+  async getPurchases(
+    @Auth() user: User,
+    @Query() query: PaginationQueryDto,
+  ): Promise<WebResponse<PostingCreditPurchaseResponse[]>> {
+    return this.paymentService.getPostingCreditPurchaseByUserId(
+      user.id,
+      query.page,
+      query.size,
+    );
   }
 }
