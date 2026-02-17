@@ -10,7 +10,11 @@ export class AddBalanceWalletInitRequest {
 }
 
 export class TopupWalletRequest {
-  @ApiProperty({ example: 50000, description: 'Amount to top up', minimum: 10000 })
+  @ApiProperty({
+    example: 50000,
+    description: 'Amount to top up',
+    minimum: 10000,
+  })
   balance: number;
 }
 
@@ -154,7 +158,11 @@ export class ListWithdrawMethodResponse {
 }
 
 export class CreateWithdrawRequestRequest {
-  @ApiProperty({ example: 50000, description: 'Amount to withdraw', minimum: 10000 })
+  @ApiProperty({
+    example: 50000,
+    description: 'Amount to withdraw',
+    minimum: 10000,
+  })
   amount: number;
 
   @ApiProperty({ example: 1, description: 'Withdraw method ID' })
@@ -251,27 +259,41 @@ export class ListWithdrawRequestResponse {
 }
 
 export class LockWithdrawRequest {
-  @ApiPropertyOptional({ example: 'Processing this request', description: 'Admin note' })
+  @ApiPropertyOptional({
+    example: 'Processing this request',
+    description: 'Admin note',
+  })
   admin_note?: string;
 }
 
 export class ApproveWithdrawRequest {
-  @ApiPropertyOptional({ example: 'Approved for payment', description: 'Admin note' })
+  @ApiPropertyOptional({
+    example: 'Approved for payment',
+    description: 'Admin note',
+  })
   admin_note?: string;
 }
 
 export class RejectWithdrawRequest {
-  @ApiProperty({ example: 'Insufficient verification documents', description: 'Reason for rejection' })
+  @ApiProperty({
+    example: 'Insufficient verification documents',
+    description: 'Reason for rejection',
+  })
   admin_note: string;
 }
 
 export class SendWithdrawRequest {
-  @ApiProperty({ example: 'https://cdn.example.com/receipt.jpg', description: 'Transfer receipt URL' })
+  @ApiProperty({
+    example: 'https://cdn.example.com/receipt.jpg',
+    description: 'Transfer receipt URL',
+  })
   transfer_receipt: string;
 }
 
 export class WithdrawRequestQueryParams {
-  @ApiPropertyOptional({ enum: ['PENDING', 'PROCESSING', 'APPROVED', 'REJECTED', 'SENT'] })
+  @ApiPropertyOptional({
+    enum: ['PENDING', 'PROCESSING', 'APPROVED', 'REJECTED', 'SENT'],
+  })
   status?: 'PENDING' | 'PROCESSING' | 'APPROVED' | 'REJECTED' | 'SENT';
 
   @ApiPropertyOptional()
@@ -301,4 +323,47 @@ export class WithdrawPreviewResponse {
 
   @ApiProperty()
   reason: string;
+}
+
+export class TopupCreditRequest {
+  package_id: number;
+}
+
+export class CreditBalanceResponse {
+  free_quota: number;
+  paid_credit: number;
+}
+
+export class PostingPackageResponse {
+  name: string;
+  credit_amount: number;
+  price: Decimal;
+  is_active?: boolean;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+export class ListPostingPackageResponse {
+  packages: PostingPackageResponse[];
+}
+
+export class AddPostinCreditPackageRequest {
+  name: string;
+  credit_amount: number;
+  price: number;
+}
+
+export class EditPostingCreditPackageRequest {
+  name: string;
+  credit_amount: number;
+  price: number;
+  is_active: boolean;
+}
+
+export class PostingCreditPurchaseResponse {
+  paid_at: Date | null;
+  payment_reference: string;
+  status: string;
+  credit_amount: number;
+  total_price: Decimal;
 }
