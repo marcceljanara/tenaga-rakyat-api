@@ -33,6 +33,7 @@ import {
   SendWithdrawRequest,
   TopupCallbackRequest,
   TopupCreditRequest,
+  TopupWalletRequest,
   // TopupWalletRequest,
   TransactionListResponse,
   WalletResponse,
@@ -97,75 +98,75 @@ export class PaymentController {
     };
   }
 
-  // @Post('/wallets/topup')
-  // @HttpCode(200)
-  // @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA])
-  // @ApiBearerAuth()
-  // @ApiOperation({
-  //   summary: 'Top up wallet',
-  //   description: 'Create top-up transaction via Midtrans (minimum: 10,000)',
-  // })
-  // @ApiBody({ type: TopupWalletRequest })
-  // @ApiResponse({
-  //   status: 200,
-  //   description:
-  //     'Payment link created. Returns Midtrans snap token and redirect URL.',
-  //   schema: {
-  //     type: 'object',
-  //     properties: {
-  //       message: { type: 'string', example: 'Silahkan selesaikan pembayaran' },
-  //       data: {
-  //         type: 'object',
-  //         properties: {
-  //           token: { type: 'string', example: 'snap-token-here' },
-  //           redirect_url: {
-  //             type: 'string',
-  //             example: 'https://app.midtrans.com/snap/v2/...',
-  //           },
-  //         },
-  //       },
-  //     },
-  //   },
-  // })
-  // @ApiResponse({ status: 404, description: 'Wallet not found' })
-  // async topupWallet(
-  //   @Auth() user: User,
-  //   @Body() request: TopupWalletRequest,
-  // ): Promise<WebResponse<any>> {
-  //   const result = await this.paymentService.createTopupTransaction(
-  //     request,
-  //     user,
-  //   );
+  @Post('/wallets/topup')
+  @HttpCode(200)
+  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA])
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Top up wallet',
+    description: 'Create top-up transaction via Midtrans (minimum: 10,000)',
+  })
+  @ApiBody({ type: TopupWalletRequest })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Payment link created. Returns Midtrans snap token and redirect URL.',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Silahkan selesaikan pembayaran' },
+        data: {
+          type: 'object',
+          properties: {
+            token: { type: 'string', example: 'snap-token-here' },
+            redirect_url: {
+              type: 'string',
+              example: 'https://app.midtrans.com/snap/v2/...',
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Wallet not found' })
+  async topupWallet(
+    @Auth() user: User,
+    @Body() request: TopupWalletRequest,
+  ): Promise<WebResponse<any>> {
+    const result = await this.paymentService.createTopupTransaction(
+      request,
+      user,
+    );
 
-  //   return {
-  //     message: 'Silahkan selesaikan pembayaran',
-  //     data: result,
-  //   };
-  // }
+    return {
+      message: 'Silahkan selesaikan pembayaran',
+      data: result,
+    };
+  }
 
-  // @Post('/webhook/midtrans')
-  // @HttpCode(200)
-  // @ApiOperation({
-  //   summary: 'Midtrans webhook',
-  //   description: 'Handle Midtrans payment callback (Midtrans only)',
-  // })
-  // @ApiBody({ type: TopupCallbackRequest })
-  // @ApiResponse({
-  //   status: 200,
-  //   description: 'Callback processed',
-  //   schema: {
-  //     type: 'object',
-  //     properties: {
-  //       message: { type: 'string', example: 'OK' },
-  //     },
-  //   },
-  // })
-  // @ApiResponse({ status: 401, description: 'Invalid signature' })
-  // async midtransCallback(@Body() body: TopupCallbackRequest) {
-  //   console.log('Midtrans callback received:', body);
-  //   await this.paymentService.handleCallback(body);
-  //   return { message: 'OK' };
-  // }
+  @Post('/webhook/midtrans')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Midtrans webhook',
+    description: 'Handle Midtrans payment callback (Midtrans only)',
+  })
+  @ApiBody({ type: TopupCallbackRequest })
+  @ApiResponse({
+    status: 200,
+    description: 'Callback processed',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'OK' },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Invalid signature' })
+  async midtransCallback(@Body() body: TopupCallbackRequest) {
+    console.log('Midtrans callback received:', body);
+    await this.paymentService.handleCallback(body);
+    return { message: 'OK' };
+  }
 
   @Get('/wallets')
   @HttpCode(200)
