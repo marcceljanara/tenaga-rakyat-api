@@ -43,6 +43,8 @@ model User {
   longitude Decimal? @db.Decimal(9,6)
   location_label String? @db.VarChar(255)
   ktp_number_encrypted String? @db.VarChar(255)
+  reviews_given     Review[]  @relation("ReviewsGiven")
+  reviews_received  Review[]  @relation("ReviewsReceived")
   average_rating Decimal? @db.Decimal(2,1)
   is_deleted Boolean @default(false)
   is_suspended Boolean @default(false)
@@ -205,6 +207,7 @@ model Job {
   worker User? @relation("WorkedJobs", fields: [worker_id], references: [id], onDelete: SetNull)
   jobTransactions Transaction[]
   jobApplications JobApplication[]
+  reviews      Review[]
   jobEscrow Escrow?
   payment_method PaymentMethod @default(ESCROW_SYSTEM)
   title String @db.VarChar(255)
@@ -253,6 +256,38 @@ enum ApplicationStatus {
   UNDER_REVIEW
   ACCEPTED
   REJECTED
+}
+
+model Review {
+  id            Int       @id @default(autoincrement())
+  job_id        Int       @unique
+  job           Job       @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  reviewer_id   String
+  reviewer      User      @relation("ReviewsGiven", fields: [reviewer_id], references: [id], onDelete: Cascade)
+
+  reviewee_id   String
+  reviewee      User      @relation("ReviewsReceived", fields: [reviewee_id], references: [id], onDelete: Cascade)
+
+  rating        Decimal   @db.Decimal(2, 1)
+  comment       String?   @db.Text
+  review_type   ReviewType
+  is_anonymous  Boolean   @default(false)
+
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  @@unique([job_id, review_type])
+  @@index([reviewer_id])
+  @@index([reviewee_id])
+  @@index([created_at])
+  @@map("reviews")
+}
+
+enum ReviewType {
+  PROVIDER_TO_WORKER
+  WORKER_TO_PROVIDER
 }
 
 model Wallet {
