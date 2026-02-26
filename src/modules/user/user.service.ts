@@ -69,6 +69,11 @@ export class UserService {
           user_id: user.id,
         },
       });
+      await tx.userPostingQuota.create({
+        data: {
+          user_id: user.id,
+        },
+      });
       return {
         id: user.id,
         full_name: user.full_name,
