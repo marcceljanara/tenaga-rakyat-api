@@ -42,10 +42,10 @@ export class UserController {
   constructor(
     private userService: UserService,
     private profilePictureService: ProfilePictureService,
-  ) {}
+  ) { }
 
   @Post()
-  @HttpCode(200)
+  @HttpCode(201)
   @ApiOperation({
     summary: 'Register user',
     description:
@@ -53,7 +53,7 @@ export class UserController {
   })
   @ApiBody({ type: RegisterUserRequest })
   @ApiResponse({
-    status: 200,
+    status: 201,
     description: 'User registered successfully. Verification email sent.',
     schema: {
       type: 'object',
