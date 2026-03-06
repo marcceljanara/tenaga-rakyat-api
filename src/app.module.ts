@@ -12,6 +12,8 @@ import { UserManagementModule } from './modules/user-management/user-management.
 import { AdminModule } from './modules/admin/admin.module';
 import { ReportModule } from './modules/report/report.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { LocationModule } from './modules/location/location.module';
+import { ReviewModule } from './modules/review/review.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { AuthModule } from './modules/auth/auth.module';
     AdminModule,
     ReportModule,
     AuthModule,
+    LocationModule,
+    ReviewModule,
   ],
   controllers: [],
   providers: [CronService],

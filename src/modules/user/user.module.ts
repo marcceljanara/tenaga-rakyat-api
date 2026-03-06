@@ -6,6 +6,7 @@ import { ProfilePictureService } from './profile-picture.service';
 import { EmailVerificationService } from '../auth/email-verification.service';
 import { EmailSenderService } from '../auth/email-sender.service';
 import { BullModule } from '@nestjs/bull';
+import { LocationService } from '../location/location.service';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { BullModule } from '@nestjs/bull';
     ProfilePictureService,
     EmailVerificationService,
     EmailSenderService,
+    LocationService,
   ],
 })
 export class UserModule {}

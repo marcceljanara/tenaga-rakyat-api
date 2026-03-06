@@ -16,9 +16,7 @@ export class EmailSenderService {
   private transporter: Transporter;
   private readonly logger = new Logger(EmailSenderService.name);
 
-  constructor(
-    @InjectQueue('email') private emailQueue: Queue,
-  ) {
+  constructor(@InjectQueue('email') private emailQueue: Queue) {
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
       pool: true,
@@ -98,7 +96,9 @@ export class EmailSenderService {
         html: options.html,
       });
 
-      this.logger.log(`Email sent successfully: ${info.messageId} to ${options.to}`);
+      this.logger.log(
+        `Email sent successfully: ${info.messageId} to ${options.to}`,
+      );
     } catch (error) {
       this.logger.error(`Failed to send email to ${options.to}:`, error);
       throw error; // Let Bull handle retry

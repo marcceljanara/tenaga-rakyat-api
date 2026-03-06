@@ -10,15 +10,22 @@ import { PrismaService } from '../../common/prisma.service';
 import { Logger } from 'winston';
 import {
   AddBalanceWalletInitRequest,
+  AddPostinCreditPackageRequest,
   AddWithdrawMethodRequest,
   ApproveWithdrawRequest,
   CreateWithdrawRequestRequest,
+  CreditBalanceResponse,
+  EditPostingCreditPackageRequest,
+  ListPostingPackageResponse,
   ListWithdrawMethodResponse,
   ListWithdrawRequestResponse,
   LockWithdrawRequest,
+  PostingCreditPurchaseResponse,
+  PostingPackageResponse,
   RejectWithdrawRequest,
   SendWithdrawRequest,
   TopupCallbackRequest,
+  TopupCreditRequest,
   TopupWalletRequest,
   WalletResponse,
   WithdrawMethodReadyToPay,
@@ -30,6 +37,8 @@ import {
 } from '../../model/payment.model';
 import { PaymentValidation } from './payment.validation';
 import {
+  Prisma,
+  PurchaseStatus,
   TransactionType,
   TransactonStatus,
   User,
@@ -38,7 +47,8 @@ import {
 import { MidtransService } from './midtrans/midtrans.service';
 import { CryptoUtil } from '../../common/crypto.util';
 import { dec } from '../../common/decimal.util';
-import { ROLES } from 'src/common/role/role';
+import { ROLES } from '../../common/role/role';
+import { WebResponse } from '../../model/web.model';
 
 @Injectable()
 export class PaymentService {
@@ -924,5 +934,373 @@ export class PaymentService {
     this.logger.info(`Withdraw request ${requestId} marked as SENT`);
   }
 
-  // perlu tambah logic untuk fee withdraw
+  // ===========LOGIC SERVICE UNTUK KREDIT=========================================================
+  async getPostingCreditPackages(): Promise<ListPostingPackageResponse> {
+    const result = await this.prismaService.postingCreditPackage.findMany({
+      orderBy: {
+        credit_amount: 'asc',
+      },
+    });
+    return {
+      packages: result,
+    };
+  }
+
+  async getPostingCreditPackagesGeneral(): Promise<ListPostingPackageResponse> {
+    const result = await this.prismaService.postingCreditPackage.findMany({
+      orderBy: {
+        credit_amount: 'asc',
+      },
+      where: {
+        is_active: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        credit_amount: true,
+        price: true,
+      },
+    });
+    return {
+      packages: result,
+    };
+  }
+
+  async addPostingCreditPackage(
+    request: AddPostinCreditPackageRequest,
+  ): Promise<PostingPackageResponse> {
+    this.logger.debug('Request add posting credit package: ', request);
+    const userRequest = this.validationService.validate(
+      PaymentValidation.ADD_POSTING_CREDIT_PACKAGE,
+      request,
+    );
+    const result = await this.prismaService.postingCreditPackage.create({
+      data: {
+        name: userRequest.name,
+        credit_amount: userRequest.credit_amount,
+        price: userRequest.price,
+      },
+    });
+    return result;
+  }
+
+  async editPostingCreditPackageById(
+    packageId: number,
+    request: EditPostingCreditPackageRequest,
+  ): Promise<PostingPackageResponse> {
+    const userRequest = this.validationService.validate(
+      PaymentValidation.EDIT_POSTING_CREDIT_PACKAGE,
+      request,
+    );
+    const result = await this.prismaService.postingCreditPackage.update({
+      where: {
+        id: packageId,
+      },
+      data: {
+        name: userRequest.name,
+        price: userRequest.price,
+        credit_amount: userRequest.credit_amount,
+        is_active: userRequest.is_active,
+      },
+    });
+
+    if (!result) {
+      throw new HttpException('Package Posting tidak ditemukan', 404);
+    }
+
+    return result;
+  }
+
+  async deletePostingCreditPackage(packageId: number): Promise<string> {
+    this.logger.debug(`Log delete posting credit ID: ${packageId}`);
+    const result = await this.prismaService.postingCreditPackage.delete({
+      where: {
+        id: packageId,
+      },
+    });
+    if (!result) {
+      throw new HttpException('Package Posting tidak ditemukan', 404);
+    }
+    return `Package ID ${packageId} berhasil dihapus`;
+  }
+
+  async getCredit(userId: string): Promise<CreditBalanceResponse> {
+    this.logger.debug('User ID Credit Balance: ', userId);
+    const result = await this.prismaService.userPostingQuota.findUnique({
+      where: {
+        user_id: userId,
+      },
+      select: {
+        free_quota: true,
+        paid_credit: true,
+      },
+    });
+    if (!result) {
+      throw new HttpException('Credit tidak ditemukan', 404);
+    }
+    return result;
+  }
+
+  async createTopupCreditTransaction(request: TopupCreditRequest, user: User) {
+    const userRequest = this.validationService.validate(
+      PaymentValidation.TOP_UP_CREDIT,
+      request,
+    );
+
+    const userPostingQuota =
+      await this.prismaService.userPostingQuota.findUnique({
+        where: { user_id: user.id },
+        include: {
+          user: true,
+        },
+      });
+
+    if (!userPostingQuota) {
+      throw new HttpException('User Quota tidak ditemukan', 404);
+    }
+
+    const creditPackage =
+      await this.prismaService.postingCreditPackage.findUnique({
+        where: { id: userRequest.package_id },
+      });
+
+    if (!creditPackage) {
+      throw new HttpException('Credit package tidak ditemukan', 404);
+    }
+
+    // Generate orderId sebelum transaction supaya konsisten
+    const orderId: string = crypto.randomUUID();
+
+    // 🔥 DB Transaction (Atomic)
+    await this.prismaService.$transaction(
+      async (tx) => {
+        const transaction = await tx.transaction.create({
+          data: {
+            amount: creditPackage.price,
+            transaction_type: TransactionType.FUNDING,
+            status: TransactonStatus.PENDING,
+            destination_wallet_id: null,
+            source_wallet_id: null,
+          },
+        });
+
+        const purchase = await tx.postingCreditPurchase.create({
+          data: {
+            user_id: userPostingQuota.user_id,
+            package_id: creditPackage.id,
+            credit_amount: creditPackage.credit_amount,
+            total_price: creditPackage.price,
+            payment_reference: orderId,
+            transaction_id: transaction.id, // penting untuk relasi
+          },
+        });
+
+        return { transaction, purchase };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+
+    try {
+      // 🌍 External Call (DI LUAR transaction DB)
+      const midtransRes = await this.midtransService.createTransaction({
+        orderId,
+        amount: Number(creditPackage.price),
+        customerName: userPostingQuota.user.full_name,
+        customerEmail: userPostingQuota.user.email,
+        itemName: 'Top Up Credit',
+      });
+
+      return midtransRes;
+    } catch (err) {
+      await this.prismaService.postingCreditPurchase.update({
+        where: { payment_reference: orderId },
+        data: { status: PurchaseStatus.FAILED },
+      });
+
+      throw err;
+    }
+  }
+
+  async handleCallbackCredit(body: TopupCallbackRequest) {
+    const isValid = this.midtransService.verifySignature(
+      body.order_id,
+      body.status_code,
+      body.gross_amount,
+      body.signature_key,
+    );
+
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid signature');
+    }
+
+    const orderId = body.order_id;
+
+    switch (body.transaction_status) {
+      case 'settlement':
+        await this.completeTopupCredit(orderId, body);
+        break;
+
+      case 'expire':
+        await this.markExpired(orderId);
+        break;
+      case 'cancel':
+        await this.markFailed(orderId);
+        break;
+
+      case 'deny':
+        await this.markFailed(orderId);
+        break;
+
+      case 'pending':
+        break;
+
+      default:
+        console.warn('Unhandled Midtrans status:', body.transaction_status);
+    }
+
+    return { success: true };
+  }
+
+  async markExpired(orderId: string) {
+    await this.prismaService.postingCreditPurchase.updateMany({
+      where: {
+        payment_reference: orderId,
+        status: PurchaseStatus.PENDING,
+      },
+      data: {
+        status: PurchaseStatus.EXPIRED,
+      },
+    });
+  }
+
+  async markFailed(orderId: string) {
+    await this.prismaService.postingCreditPurchase.updateMany({
+      where: {
+        payment_reference: orderId,
+        status: PurchaseStatus.PENDING,
+      },
+      data: {
+        status: PurchaseStatus.FAILED,
+      },
+    });
+  }
+
+  async completeTopupCredit(orderId: string, body: TopupCallbackRequest) {
+    await this.prismaService.$transaction(
+      async (tx) => {
+        const creditPurchaseTx = await tx.postingCreditPurchase.findUnique({
+          where: {
+            payment_reference: orderId,
+          },
+        });
+
+        if (!creditPurchaseTx) {
+          throw new HttpException('Purchase not found', 404);
+        }
+
+        if (
+          Number(body.gross_amount) !== Number(creditPurchaseTx.total_price)
+        ) {
+          throw new Error('Amount mismatch');
+        }
+
+        if (creditPurchaseTx.status === PurchaseStatus.PAID) return;
+
+        if (creditPurchaseTx.status === PurchaseStatus.EXPIRED) {
+          throw new HttpException(
+            'Transaksi pembayaran telah expired/kadaluarsa',
+            410,
+          );
+        }
+
+        if (creditPurchaseTx.status === PurchaseStatus.FAILED) {
+          throw new HttpException('Transaksi pembayaran gagal', 422);
+        }
+
+        const updated = await tx.postingCreditPurchase.updateMany({
+          where: {
+            payment_reference: orderId,
+            status: PurchaseStatus.PENDING, // guard
+          },
+          data: {
+            paid_at: new Date(),
+            status: PurchaseStatus.PAID,
+          },
+        });
+
+        if (updated.count === 0) {
+          return; // sudah pernah diproses
+        }
+
+        const trx = await tx.transaction.findUnique({
+          where: { id: creditPurchaseTx.transaction_id },
+        });
+
+        if (!trx) throw new Error('Transaction not found');
+        if (trx.status === TransactonStatus.COMPLETED) return;
+
+        await tx.transaction.update({
+          where: { id: trx.id },
+          data: { status: TransactonStatus.COMPLETED },
+        });
+
+        await tx.userPostingQuota.update({
+          where: {
+            user_id: creditPurchaseTx.user_id,
+          },
+          data: {
+            paid_credit: {
+              increment: creditPurchaseTx.credit_amount,
+            },
+          },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+    console.log('Topup success:', orderId);
+  }
+
+  async getPostingCreditPurchaseByUserId(
+    userId: string,
+    page: number = 1,
+    size: number = 10,
+  ): Promise<WebResponse<PostingCreditPurchaseResponse[]>> {
+    this.logger.debug(`Get posting credit purchase userId: ${userId}`);
+    const skip = (page - 1) * size;
+    const [total, result] = await this.prismaService.$transaction([
+      this.prismaService.postingCreditPurchase.count({
+        where: {
+          user_id: userId,
+        },
+      }),
+
+      this.prismaService.postingCreditPurchase.findMany({
+        where: {
+          user_id: userId,
+        },
+        skip,
+        take: size,
+        orderBy: {
+          paid_at: 'desc',
+        },
+        select: {
+          paid_at: true,
+          payment_reference: true,
+          status: true,
+          credit_amount: true,
+          total_price: true,
+        },
+      }),
+    ]);
+
+    return {
+      data: result,
+      paging: {
+        size,
+        total_page: Math.ceil(total / size),
+        current_page: page,
+        total_data: total,
+      },
+    };
+  }
 }
