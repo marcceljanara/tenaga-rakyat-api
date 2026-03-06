@@ -24,6 +24,7 @@ export class TestService {
 
     await this.prismaService.refreshToken.deleteMany();
     await this.prismaService.userPhotos.deleteMany();
+    await this.prismaService.userPostingQuota.deleteMany();
     await this.prismaService.user.deleteMany({
       where: {
         NOT: {
@@ -89,6 +90,11 @@ export class TestService {
         user_id: user.id,
       },
     });
+    await this.prismaService.userPostingQuota.create({
+      data: {
+        user_id: user.id,
+      },
+    });
     return user.id;
   }
 
@@ -104,6 +110,11 @@ export class TestService {
       },
     });
     await this.prismaService.wallet.create({
+      data: {
+        user_id: user.id,
+      },
+    });
+    await this.prismaService.userPostingQuota.create({
       data: {
         user_id: user.id,
       },
