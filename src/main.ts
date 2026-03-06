@@ -101,6 +101,7 @@ Success response mengikuti format:
     .addTag('Admin - User Management', 'Endpoints untuk admin mengelola user')
     .addTag('Admin - Reports', 'Endpoints untuk laporan dan statistik platform')
     .addTag('User Photos', 'Endpoints untuk manajemen foto portfolio pengguna')
+    .addTag('Reviews', 'Endpoints untuk review bidireksional antara pemberi kerja dan pekerja')
     .addServer('http://localhost:3000', 'Development Server')
     .addServer('https://api.example.com', 'Production Server')
     .build();

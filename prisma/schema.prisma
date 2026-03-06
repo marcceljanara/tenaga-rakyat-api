@@ -260,7 +260,7 @@ enum ApplicationStatus {
 
 model Review {
   id            Int       @id @default(autoincrement())
-  job_id        Int       @unique
+  job_id        Int
   job           Job       @relation(fields: [job_id], references: [id], onDelete: Cascade)
 
   reviewer_id   String
