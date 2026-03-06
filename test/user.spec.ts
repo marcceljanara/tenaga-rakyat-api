@@ -8,6 +8,7 @@ import { TestModule } from './test.module';
 import { TestService } from './test.service';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
+import { EmailSenderService } from '../src/modules/auth/email-sender.service';
 
 describe('UserController', () => {
   let app: INestApplication<App>;
@@ -17,7 +18,15 @@ describe('UserController', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule, TestModule],
-    }).compile();
+    })
+      .overrideProvider(EmailSenderService)
+      .useValue({
+        sendEmail: jest.fn().mockResolvedValue(undefined),
+        sendEmailSync: jest.fn().mockResolvedValue(undefined),
+        processEmail: jest.fn().mockResolvedValue(undefined),
+        sendBulkEmails: jest.fn().mockResolvedValue(undefined),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.use(cookieParser());
@@ -32,12 +41,28 @@ describe('UserController', () => {
     await app.close();
   });
 
+  // ============================================================
+  // HELPER: Login and return cookies
+  // ============================================================
+  async function loginUser(
+    email = 'test@email.com',
+    password = '1234test',
+  ): Promise<string[]> {
+    const login = await request(app.getHttpServer())
+      .post('/api/users/login')
+      .send({ email, password });
+    return login.headers['set-cookie'] as unknown as string[];
+  }
+
+  // ============================================================
+  // POST /api/users — Registration
+  // ============================================================
   describe('POST /api/users', () => {
     beforeEach(async () => {
       await testService.deleteAll();
     });
-    it('should be able to register', async () => {
-      // Arrange
+
+    it('should be able to register a worker', async () => {
       const payload = {
         full_name: 'test',
         phone_number: '085212345678',
@@ -46,20 +71,37 @@ describe('UserController', () => {
         role_id: 1,
       };
 
-      // Action
       const response = await request(app.getHttpServer())
         .post('/api/users')
         .send(payload);
 
-      // Assert
       logger.debug(response.body);
-      expect(response.statusCode).toBe(200);
+      expect(response.statusCode).toBe(201);
       expect(response.body.data.id).toBeDefined();
       expect(response.body.data.full_name).toBe('test');
+      expect(response.body.data.email).toBe('test@email.com');
+    });
+
+    it('should be able to register a job provider', async () => {
+      const payload = {
+        full_name: 'Provider Test',
+        phone_number: '085212345678',
+        email: 'provider@email.com',
+        password: 'test1234',
+        role_id: 2,
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/users')
+        .send(payload);
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(201);
+      expect(response.body.data.id).toBeDefined();
+      expect(response.body.data.full_name).toBe('Provider Test');
     });
 
     it('should reject if payload invalid', async () => {
-      // Arrange
       const payload = {
         full_name: '',
         phone_number: '',
@@ -68,71 +110,156 @@ describe('UserController', () => {
         role_id: 1,
       };
 
-      // Action
       const response = await request(app.getHttpServer())
         .post('/api/users')
         .send(payload);
 
-      // Assert
-      logger.debug(response);
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(400);
+      expect(response.body.errors).toBeDefined();
+    });
+
+    it('should reject if email already exists', async () => {
+      await testService.addUser();
+
+      const payload = {
+        full_name: 'Duplicate',
+        phone_number: '085299999999',
+        email: 'test@email.com', // same email as testService.addUser()
+        password: 'test1234',
+        role_id: 1,
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/users')
+        .send(payload);
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(400);
+      expect(response.body.errors).toBeDefined();
+    });
+
+    it('should reject if phone number already exists', async () => {
+      await testService.addUser();
+
+      const payload = {
+        full_name: 'Duplicate Phone',
+        phone_number: '085212345678', // same phone as testService.addUser()
+        email: 'different@email.com',
+        password: 'test1234',
+        role_id: 1,
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/users')
+        .send(payload);
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(400);
+      expect(response.body.errors).toBeDefined();
+    });
+
+    it('should reject if role_id is invalid (not 1 or 2)', async () => {
+      const payload = {
+        full_name: 'Bad Role',
+        phone_number: '085212345678',
+        email: 'badrole@email.com',
+        password: 'test1234',
+        role_id: 3, // admin role not allowed via registration
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/users')
+        .send(payload);
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(400);
+      expect(response.body.errors).toBeDefined();
+    });
+
+    it('should reject if password too short', async () => {
+      const payload = {
+        full_name: 'Short Pass',
+        phone_number: '085212345678',
+        email: 'shortpass@email.com',
+        password: '123', // min 8 chars
+        role_id: 1,
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/users')
+        .send(payload);
+
+      logger.debug(response.body);
       expect(response.statusCode).toBe(400);
       expect(response.body.errors).toBeDefined();
     });
   });
 
+  // ============================================================
+  // POST /api/users/login — Login
+  // ============================================================
   describe('POST /api/users/login', () => {
     beforeEach(async () => {
       await testService.deleteAll();
     });
+
     it('should reject request if payload invalid', async () => {
-      // Arrange
       const payload = {
         email: '',
         password: '',
       };
 
-      // Action
       const response = await request(app.getHttpServer())
         .post('/api/users/login')
         .send(payload);
 
-      // Assert
       logger.debug(response.body);
       expect(response.statusCode).toBe(400);
       expect(response.body.errors).toBeDefined();
     });
 
     it('should reject if account not exists', async () => {
-      // Arrange
       const payload = {
         email: 'test@email.com',
         password: '1234test',
       };
 
-      // Action
       const response = await request(app.getHttpServer())
         .post('/api/users/login')
         .send(payload);
 
-      // Assert
       logger.debug(response.body);
       expect(response.statusCode).toBe(401);
       expect(response.body.errors).toBeDefined();
     });
+
+    it('should reject if password wrong', async () => {
+      await testService.addUser();
+
+      const response = await request(app.getHttpServer())
+        .post('/api/users/login')
+        .send({
+          email: 'test@email.com',
+          password: 'wrongpassword',
+        });
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(401);
+      expect(response.body.errors).toBeDefined();
+    });
+
     it('should able to login user', async () => {
-      // Arrange
       await testService.addUser();
       const payload = {
         email: 'test@email.com',
         password: '1234test',
       };
 
-      // Action
       const response = await request(app.getHttpServer())
         .post('/api/users/login')
         .send(payload);
 
-      // Assert
       logger.debug(response.body);
       expect(response.statusCode).toBe(200);
       expect(response.headers['set-cookie']).toBeDefined();
@@ -141,35 +268,32 @@ describe('UserController', () => {
     });
   });
 
+  // ============================================================
+  // POST /api/users/refresh — Token Refresh
+  // ============================================================
   describe('POST /api/users/refresh', () => {
     beforeEach(async () => {
       await testService.deleteAll();
     });
+
     it('should reject if user not login', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/users/refresh')
         .set('Cookie', '');
+
       logger.debug(response.body);
       expect(response.statusCode).toBe(401);
       expect(response.body.errors).toBeDefined();
     });
-    it('should be able to refresh new token', async () => {
-      // Arrange
-      await testService.addUser();
-      const login = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({
-          email: 'test@email.com',
-          password: '1234test',
-        });
-      const userCookie = login.headers['set-cookie'];
 
-      // Action
+    it('should be able to refresh new token', async () => {
+      await testService.addUser();
+      const userCookie = await loginUser();
+
       const response = await request(app.getHttpServer())
         .post('/api/users/refresh')
         .set('Cookie', userCookie);
 
-      // Assert
       logger.debug(response.headers['set-cookie']);
       expect(response.statusCode).toBe(200);
       expect(response.headers['set-cookie']).toBeDefined();
@@ -179,35 +303,32 @@ describe('UserController', () => {
     });
   });
 
+  // ============================================================
+  // POST /api/users/logout — Logout
+  // ============================================================
   describe('POST /api/users/logout', () => {
     beforeEach(async () => {
       await testService.deleteAll();
     });
+
     it('should reject if user not login', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/users/logout')
         .set('Cookie', '');
+
       logger.debug(response.body);
       expect(response.statusCode).toBe(401);
       expect(response.body.errors).toBeDefined();
     });
-    it('should be able to logout', async () => {
-      // Arrange
-      await testService.addUser();
-      const login = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({
-          email: 'test@email.com',
-          password: '1234test',
-        });
-      const userCookie = login.headers['set-cookie'];
 
-      // Action
+    it('should be able to logout', async () => {
+      await testService.addUser();
+      const userCookie = await loginUser();
+
       const response = await request(app.getHttpServer())
         .post('/api/users/logout')
         .set('Cookie', userCookie);
 
-      // Assert
       logger.debug(response.headers['set-cookie'][0]);
       expect(response.statusCode).toBe(200);
       expect(response.headers['set-cookie'][0]).toContain(
@@ -215,51 +336,132 @@ describe('UserController', () => {
       );
       expect(response.headers['set-cookie'][0]).toContain('access_token=;');
     });
+
+    it('should reject requests after logout (cookie cleared)', async () => {
+      await testService.addUser();
+      const userCookie = await loginUser();
+
+      // Logout
+      await request(app.getHttpServer())
+        .post('/api/users/logout')
+        .set('Cookie', userCookie);
+
+      // Try to access profile with old cookie — should fail
+      const response = await request(app.getHttpServer())
+        .get('/api/users/profile')
+        .set('Cookie', '');
+
+      expect(response.statusCode).toBe(401);
+    });
   });
 
+  // ============================================================
+  // GET /api/users/profile — Get Own Profile
+  // ============================================================
   describe('GET /api/users/profile', () => {
     beforeEach(async () => {
       await testService.deleteAll();
     });
 
-    it('should be able to get profile', async () => {
-      // Arrange
-      await testService.addUser();
-      const login = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({
-          email: 'test@email.com',
-          password: '1234test',
-        });
-      const userCookie = login.headers['set-cookie'];
+    it('should reject if not authenticated', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/users/profile');
 
-      // Action
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('should be able to get profile', async () => {
+      await testService.addUser();
+      const userCookie = await loginUser();
+
       const response = await request(app.getHttpServer())
         .get('/api/users/profile')
         .set('Cookie', userCookie);
 
-      // Assert
       logger.debug(response.body);
       expect(response.statusCode).toBe(200);
       expect(response.body.data).toBeDefined();
       expect(response.body.data.email).toBe('test@email.com');
+      expect(response.body.data.full_name).toBe('test');
+      expect(response.body.data.role).toBeDefined();
     });
   });
+
+  // ============================================================
+  // GET /api/users/profile/:id — Get Profile By ID
+  // ============================================================
+  describe('GET /api/users/profile/:id', () => {
+    beforeEach(async () => {
+      await testService.deleteAll();
+    });
+
+    it('should reject if not authenticated', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/users/profile/some-uuid');
+
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('should be able to get another user profile by ID', async () => {
+      const userId = await testService.addUser();
+      const providerId = await testService.addProvider();
+
+      // Login as provider, view worker profile
+      const providerCookie = await loginUser('provider@email.com', '1234test');
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/users/profile/${userId}`)
+        .set('Cookie', providerCookie);
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.data).toBeDefined();
+    });
+
+    it('should return 404 for non-existent user ID', async () => {
+      await testService.addUser();
+      const userCookie = await loginUser();
+      const uuid = crypto.randomUUID();
+      const response = await request(app.getHttpServer())
+        .get(`/api/users/profile/${uuid}`)
+        .set('Cookie', userCookie);
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('should return 400 for invalid UUID format', async () => {
+      await testService.addUser();
+      const userCookie = await loginUser();
+
+      const response = await request(app.getHttpServer())
+        .get('/api/users/profile/not-a-valid-uuid')
+        .set('Cookie', userCookie);
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(400);
+    });
+  });
+
+  // ============================================================
+  // PUT /api/users/profile — Edit Profile
+  // ============================================================
   describe('PUT /api/users/profile', () => {
     beforeEach(async () => {
       await testService.deleteAll();
     });
 
+    it('should reject if not authenticated', async () => {
+      const response = await request(app.getHttpServer())
+        .put('/api/users/profile')
+        .send({ full_name: 'Updated' });
+
+      expect(response.statusCode).toBe(401);
+    });
+
     it('should be able to edit user profile', async () => {
-      // Arrange
       await testService.addUser();
-      const login = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({
-          email: 'test@email.com',
-          password: '1234test',
-        });
-      const userCookie = login.headers['set-cookie'];
+      const userCookie = await loginUser();
 
       const payload = {
         full_name: 'Otong Test',
@@ -267,13 +469,11 @@ describe('UserController', () => {
         about: 'ini about',
       };
 
-      // Action
       const response = await request(app.getHttpServer())
         .put('/api/users/profile')
         .set('Cookie', userCookie)
         .send(payload);
 
-      // Assert
       logger.debug(response.body);
       expect(response.statusCode).toBe(200);
       expect(response.body.message).toBeDefined();
@@ -281,7 +481,92 @@ describe('UserController', () => {
       expect(response.body.data.about).toBe(payload.about);
       expect(response.body.data.cv_url).toBe(payload.cv_url);
     });
+
+    it('should be able to partial update (only full_name)', async () => {
+      await testService.addUser();
+      const userCookie = await loginUser();
+
+      const response = await request(app.getHttpServer())
+        .put('/api/users/profile')
+        .set('Cookie', userCookie)
+        .send({ full_name: 'Only Name' });
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.data.full_name).toBe('Only Name');
+    });
   });
+
+  // ============================================================
+  // PUT /api/users/profile/location — Update Location
+  // ============================================================
+  describe('PUT /api/users/profile/location', () => {
+    beforeEach(async () => {
+      await testService.deleteAll();
+    });
+
+    it('should reject if not authenticated', async () => {
+      const response = await request(app.getHttpServer())
+        .put('/api/users/profile/location')
+        .send({ latitude: -6.2, longitude: 106.8 });
+
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('should be able to update location', async () => {
+      await testService.addUser();
+      const userCookie = await loginUser();
+
+      const response = await request(app.getHttpServer())
+        .put('/api/users/profile/location')
+        .set('Cookie', userCookie)
+        .send({
+          latitude: -6.200000,
+          longitude: 106.816666,
+        });
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.message).toBeDefined();
+      expect(response.body.data).toBeDefined();
+    });
+
+    it('should reject invalid latitude (out of range)', async () => {
+      await testService.addUser();
+      const userCookie = await loginUser();
+
+      const response = await request(app.getHttpServer())
+        .put('/api/users/profile/location')
+        .set('Cookie', userCookie)
+        .send({
+          latitude: 999, // out of range
+          longitude: 106.8,
+        });
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('should reject invalid longitude (out of range)', async () => {
+      await testService.addUser();
+      const userCookie = await loginUser();
+
+      const response = await request(app.getHttpServer())
+        .put('/api/users/profile/location')
+        .set('Cookie', userCookie)
+        .send({
+          latitude: -6.2,
+          longitude: 999, // out of range
+        });
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(400);
+    });
+  });
+
+  // ============================================================
+  // POST /api/users/profile/picture — Upload Profile Picture
+  // ============================================================
   describe('POST /api/users/profile/picture', () => {
     beforeEach(async () => {
       await testService.deleteAll();
@@ -298,17 +583,9 @@ describe('UserController', () => {
     });
 
     it('should be able to upload profile picture successfully', async () => {
-      // Arrange — login user
       await testService.addUser();
-      const login = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({
-          email: 'test@email.com',
-          password: '1234test',
-        });
-      const userCookie = login.headers['set-cookie'];
+      const userCookie = await loginUser();
 
-      // Action — upload file
       const response = await request(app.getHttpServer())
         .post('/api/users/profile/picture')
         .set('Cookie', userCookie)
@@ -318,7 +595,6 @@ describe('UserController', () => {
           'profile.jpg',
         );
 
-      // Assert
       logger.debug(response.body);
       expect(response.statusCode).toBe(200);
       expect(response.body.message).toBe(
@@ -327,10 +603,13 @@ describe('UserController', () => {
       expect(response.body.data).toBeDefined();
       expect(response.body.data.profile_picture_url).toMatch(
         /^https?:\/\/|^\/uploads/,
-      ); // tergantung implementasi service upload
+      );
     });
   });
 
+  // ============================================================
+  // DELETE /api/users/profile/picture — Delete Profile Picture
+  // ============================================================
   describe('DELETE /api/users/profile/picture', () => {
     beforeEach(async () => {
       await testService.deleteAll();
@@ -347,15 +626,8 @@ describe('UserController', () => {
     });
 
     it('should be able to delete profile picture successfully', async () => {
-      // Arrange — login user & upload dulu
       await testService.addUser();
-      const login = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({
-          email: 'test@email.com',
-          password: '1234test',
-        });
-      const userCookie = login.headers['set-cookie'];
+      const userCookie = await loginUser();
 
       // Upload foto dulu biar ada datanya
       await request(app.getHttpServer())
@@ -370,7 +642,6 @@ describe('UserController', () => {
         .set('Cookie', userCookie)
         .send();
 
-      // Assert
       logger.debug(response.body);
       expect(response.statusCode).toBe(200);
       expect(response.body.message).toBe(
