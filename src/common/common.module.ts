@@ -100,6 +100,8 @@ export class CommonModule implements NestModule {
         '/api/auth/change-email',
         '/api/credits',
         '/api/credits/*',
+        '/api/reviews',
+        '/api/reviews/*',
       );
   }
 }
