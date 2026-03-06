@@ -19,6 +19,8 @@ import {
   Prisma,
   WalletStatus,
 } from '@prisma/client';
+import { ROLES } from '../../common/role/role';
+import { LocationService } from '../location/location.service';
 
 @Injectable()
 export class ApplicationService {
@@ -26,6 +28,7 @@ export class ApplicationService {
     private validationService: ValidationService,
     @Inject(WINSTON_MODULE_PROVIDER) private logger: Logger,
     private prismaService: PrismaService,
+    private locationService: LocationService,
   ) {}
 
   async applyJob(
@@ -84,7 +87,7 @@ export class ApplicationService {
       throw new HttpException('Pekerja tidak ditemukan', 404);
     }
 
-    if (worker.role_id !== 1) {
+    if (worker.role_id !== ROLES.PEKERJA) {
       throw new HttpException(
         'Hanya pekerja yang dapat melamar pekerjaan',
         403,
@@ -191,6 +194,8 @@ export class ApplicationService {
               cv_url: true,
               average_rating: true,
               verification_status: true,
+              latitude: true,
+              longitude: true,
             },
           },
         },
@@ -198,8 +203,34 @@ export class ApplicationService {
       this.prismaService.jobApplication.count({ where }),
     ]);
 
+    // Kalkulasi jarak untuk setiap application
+    const applicationsWithDistance = applications.map((app) => {
+      let distance: number | null = null;
+
+      // Hitung jarak jika worker memiliki koordinat lokasi
+      if (
+        app.worker &&
+        app.worker.latitude &&
+        app.worker.longitude &&
+        job.job_latitude &&
+        job.job_longitude
+      ) {
+        distance = this.locationService.distanceKm(
+          app.worker.latitude.toNumber(),
+          app.worker.longitude.toNumber(),
+          job.job_latitude.toNumber(),
+          job.job_longitude.toNumber(),
+        );
+      }
+
+      return {
+        ...app,
+        distance,
+      };
+    });
+
     return {
-      applications: applications.map((app) =>
+      applications: applicationsWithDistance.map((app) =>
         this.mapToApplicationResponse(app),
       ),
       total,
@@ -402,6 +433,77 @@ export class ApplicationService {
 
     // --- BRANCH ACCEPTED: lakukan semua cek & perubahan di dalam TRANSAKSI ---
     if (statusRequest.status === ApplicationStatus.ACCEPTED) {
+      if (application.job.payment_method !== 'ESCROW_SYSTEM') {
+        if (application.job.status !== JobStatus.OPEN) {
+          throw new HttpException(
+            'Lowongan sudah tidak menerima perubahan status',
+            400,
+          );
+        }
+        const updatedApplication = await this.prismaService.$transaction(
+          async (tx) => {
+            // Assign job langsung tanpa escrow
+            await tx.job.update({
+              where: {
+                id: application.job_id,
+              },
+              data: {
+                status: JobStatus.ASSIGNED,
+                worker_id: application.worker_id,
+              },
+            });
+            await tx.jobApplication.updateMany({
+              where: {
+                job_id: application.job_id,
+                id: { not: applicationId },
+                status: {
+                  in: [
+                    ApplicationStatus.PENDING,
+                    ApplicationStatus.UNDER_REVIEW,
+                  ],
+                },
+              },
+              data: { status: ApplicationStatus.REJECTED },
+            });
+            // Terakhir: update application yang diterima → set jadi ACCEPTED
+            const updatedApp = await tx.jobApplication.update({
+              where: { id: applicationId },
+              data: { status: ApplicationStatus.ACCEPTED },
+              include: {
+                job: {
+                  include: {
+                    provider: {
+                      select: {
+                        id: true,
+                        full_name: true,
+                        profile_picture_url: true,
+                        average_rating: true,
+                      },
+                    },
+                  },
+                },
+                worker: {
+                  select: {
+                    id: true,
+                    full_name: true,
+                    email: true,
+                    phone_number: true,
+                    profile_picture_url: true,
+                    about: true,
+                    cv_url: true,
+                    average_rating: true,
+                    verification_status: true,
+                  },
+                },
+              },
+            });
+
+            // kembalikan updated application dari dalam transaksi
+            return updatedApp;
+          },
+        );
+        return this.mapToApplicationResponse(updatedApplication);
+      }
       // Semua DB op yang berhubungan harus menggunakan `tx`
       const updatedApplication = await this.prismaService.$transaction(
         async (tx) => {
@@ -715,6 +817,8 @@ export class ApplicationService {
             cv_url: true,
             average_rating: true,
             verification_status: true,
+            latitude: true,
+            longitude: true,
           },
         },
       },
@@ -732,7 +836,14 @@ export class ApplicationService {
       throw new HttpException('Anda tidak memiliki akses ke lamaran ini', 403);
     }
 
-    return this.mapToApplicationResponse(application);
+    const distance = this.locationService.distanceKm(
+      application.worker?.latitude?.toNumber() || 0,
+      application.worker?.longitude?.toNumber() || 0,
+      application.job.job_latitude?.toNumber() || 0,
+      application.job.job_longitude?.toNumber() || 0,
+    );
+
+    return this.mapToApplicationResponse({ ...application, distance });
   }
 
   private mapToApplicationResponse(application: any): ApplicationResponse {
@@ -750,8 +861,12 @@ export class ApplicationService {
               id: Number(application.job.id),
               title: String(application.job.title),
               description: String(application.job.description),
-              location: application.job.location,
+              location_label: application.job.location_label,
+              address_detail: application.job.address_detail,
+              job_latitude: application.job.job_latitude,
+              job_longitude: application.job.job_longitude,
               compensation_amount: Number(application.job.compensation_amount),
+              payment_method: application.job.payment_method,
               status: String(application.job.status),
               provider: {
                 id: String(application.job.provider.id),
@@ -779,6 +894,7 @@ export class ApplicationService {
             verification_status: application.worker.verification_status,
           }
         : undefined,
+      distance: application.distance,
     };
   }
 }

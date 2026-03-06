@@ -10,25 +10,56 @@ export class RegisterUserRequest {
   @ApiProperty({ example: 'user@example.com', description: 'Email address' })
   email: string;
 
-  @ApiProperty({ example: 'SecurePass123!', description: 'Password (min 8 characters)' })
+  @ApiProperty({
+    example: 'SecurePass123!',
+    description: 'Password (min 8 characters)',
+  })
   password: string;
 
-  @ApiProperty({ example: 1, description: 'Role ID: 1 = Worker, 2 = Job Provider' })
+  @ApiProperty({
+    example: 1,
+    description: 'Role ID: 1 = Worker, 2 = Job Provider',
+  })
   role_id: number;
 }
 
 export class EditUserRequest {
-  @ApiPropertyOptional({ example: 'John Doe Updated', description: 'Updated full name' })
+  @ApiPropertyOptional({
+    example: 'John Doe Updated',
+    description: 'Updated full name',
+  })
   full_name?: string;
 
-  @ApiPropertyOptional({ example: '+628987654321', description: 'Updated phone number' })
+  @ApiPropertyOptional({
+    example: '+628987654321',
+    description: 'Updated phone number',
+  })
   phone_number?: string;
 
-  @ApiPropertyOptional({ example: 'About me description...', description: 'User bio' })
+  @ApiPropertyOptional({
+    example: 'About me description...',
+    description: 'User bio',
+  })
   about?: string;
 
-  @ApiPropertyOptional({ example: 'https://cdn.example.com/cv.pdf', description: 'CV URL' })
+  @ApiPropertyOptional({
+    example: 'https://cdn.example.com/cv.pdf',
+    description: 'CV URL',
+  })
   cv_url?: string;
+
+  @ApiPropertyOptional({
+    example: 'Desa Mekar, Kecamatan Sukamaju',
+    description: 'Location label',
+  })
+  location_label?: string;
+}
+
+export class UpdateLocationRequest {
+  @ApiProperty({ example: -6.2, description: 'Latitude' })
+  latitude: number;
+  @ApiProperty({ example: 106.816666, description: 'Longitude' })
+  longitude: number;
 }
 
 export class LoginUserRequest {
@@ -102,6 +133,15 @@ export class UserResponse {
 
   @ApiPropertyOptional()
   cv_url?: string | null;
+
+  @ApiPropertyOptional()
+  latitude?: number | null;
+
+  @ApiPropertyOptional()
+  longitude?: number | null;
+
+  @ApiPropertyOptional()
+  location_label?: string | null;
 
   @ApiPropertyOptional({ type: [UserPhotoInProfile] })
   photos?: UserPhotoInProfile[];

@@ -25,6 +25,7 @@ export class UserValidation {
     phone_number: z.string().min(12).max(15).optional(),
     about: z.string().max(2500).optional(),
     cv_url: z.string().max(512).optional(),
+    location_label: z.string().max(255).optional(),
   });
 
   static readonly GET_PROFILE = z.object({

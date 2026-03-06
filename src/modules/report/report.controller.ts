@@ -1,52 +1,59 @@
-import { Controller, Get, HttpCode, Query } from '@nestjs/common';
-import { ReportService } from './report.service';
-import { Roles } from '../../common/role/role.decorator';
-import { ROLES } from '../../common/role/role';
-import { WebResponse } from '../../model/web.model';
 import {
+  Controller,
+  Get,
+  Query,
+  Res,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import type { Response } from 'express';
+import { ReportService } from './report.service';
+import type {
   ReportDashboardSummaryResponse,
   ReportDateRangeRequest,
+  TimeseriesGranularity,
 } from '../../model/report.model';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { WebResponse } from '../../model/web.model';
+import { Roles } from '../../common/role/role.decorator';
+import { ROLES } from '../../common/role/role';
+import { Auth } from '../../common/auth/auth.decorator';
+import type { User } from '@prisma/client';
 
-@ApiTags('Admin - Reports')
-@ApiBearerAuth()
 @Controller('/api/admin/report')
 export class ReportController {
   constructor(private reportService: ReportService) {}
 
-  @Get('/dashboard-summary')
-  @HttpCode(200)
+  /**
+   * GET /api/admin/report/dashboard-summary?granularity=daily
+   * granularity: daily | weekly | monthly | yearly
+   */
+  @Get('dashboard-summary')
+  @HttpCode(HttpStatus.OK)
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
-  @ApiOperation({ 
-    summary: 'Get dashboard summary', 
-    description: 'Get financial summary for admin dashboard. Includes total inflow (FUNDING), total outflow (WITHDRAWAL + ESCROW_RELEASE), platform fees, platform balance, escrow held, and pending withdrawals. Default date range: first day of current month to today.' 
-  })
-  @ApiQuery({ name: 'from', required: false, type: String, description: 'Start date (ISO format). Default: first day of current month' })
-  @ApiQuery({ name: 'to', required: false, type: String, description: 'End date (ISO format). Default: today' })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Dashboard summary retrieved',
-    schema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string', example: 'Dashboard summary fetched successfully' },
-        data: { $ref: '#/components/schemas/ReportDashboardSummaryResponse' }
-      }
-    }
-  })
   async getDashboardSummary(
-    @Query('from') from?: string,
-    @Query('to') to?: string,
+    @Auth() admin: User,
+    @Query('granularity') granularity: TimeseriesGranularity = 'daily',
   ): Promise<WebResponse<ReportDashboardSummaryResponse>> {
-    const query: ReportDateRangeRequest = {
-      from: from ? new Date(from) : new Date(new Date().setDate(1)),
-      to: to ? new Date(to) : new Date(),
-    };
-    const result = await this.reportService.dashboardSummary(query);
-    return {
-      data: result,
-      message: 'Dashboard summary fetched successfully',
-    };
+    const data = await this.reportService.getDashboardSummary(granularity);
+    return { data };
+  }
+
+  /**
+   * GET /api/admin/report/export-csv?from=2024-01-01&to=2024-12-31
+   */
+  @Get('export-csv')
+  @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  async exportCsv(
+    @Auth() admin: User,
+    @Query() query: ReportDateRangeRequest,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    const csv = await this.reportService.exportCsv(query);
+
+    const filename = `credit-report-${Date.now()}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.status(HttpStatus.OK).send(csv);
   }
 }

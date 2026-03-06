@@ -23,4 +23,7 @@ export class Paging {
 
   @ApiPropertyOptional()
   current_page: number;
+
+  @ApiPropertyOptional()
+  total_data: number;
 }

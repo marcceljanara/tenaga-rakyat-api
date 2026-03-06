@@ -59,4 +59,22 @@ export class PaymentValidation {
     amount: z.coerce.number().min(1),
     method_id: z.coerce.number().int().min(1),
   });
+
+  // ================CREDIT POSTING==================
+  static readonly ADD_POSTING_CREDIT_PACKAGE = z.object({
+    name: z.string().min(3).max(255),
+    credit_amount: z.number().min(1).max(999),
+    price: z.number().positive(),
+  });
+
+  static readonly EDIT_POSTING_CREDIT_PACKAGE = z.object({
+    name: z.string().min(3).max(255).optional(),
+    credit_amount: z.number().min(1).max(999).optional(),
+    price: z.number().positive().optional(),
+    is_active: z.boolean().optional(),
+  });
+
+  static readonly TOP_UP_CREDIT = z.object({
+    package_id: z.number().min(1).positive(),
+  });
 }

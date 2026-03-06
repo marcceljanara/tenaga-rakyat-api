@@ -21,8 +21,9 @@ export class MidtransService {
     amount: number;
     customerName?: string;
     customerEmail?: string;
+    itemName?: string;
   }) {
-    const { orderId, amount, customerName, customerEmail } = params;
+    const { orderId, amount, customerName, customerEmail, itemName } = params;
 
     const parameter: MidtransSnapParams = {
       transaction_details: {
@@ -38,7 +39,7 @@ export class MidtransService {
           id: '1',
           price: amount,
           quantity: 1,
-          name: 'Topup Wallet',
+          name: itemName || 'Topup Credit',
         },
       ],
     };
