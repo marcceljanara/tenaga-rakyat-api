@@ -5,9 +5,8 @@ export class UserManagementValidation {
   static readonly UPDATE_VERIFICATION: ZodType = z.object({
     verification_status: z.enum([
       'UNVERIFIED',
-      'PENDING',
-      'VERIFIED',
-      'REJECTED',
+      'EMAIL_VERIFIED',
+      'FULL_VERIFIED',
     ]),
   });
 

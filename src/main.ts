@@ -102,6 +102,8 @@ Success response mengikuti format:
     .addTag('Admin - Reports', 'Endpoints untuk laporan dan statistik platform')
     .addTag('User Photos', 'Endpoints untuk manajemen foto portfolio pengguna')
     .addTag('Reviews', 'Endpoints untuk review bidireksional antara pemberi kerja dan pekerja')
+    .addTag('Posting Credits', 'Endpoints untuk pembelian dan pengelolaan kredit posting')
+    .addTag('Admin - Posting Credits', 'Endpoints untuk admin mengelola paket kredit posting')
     .addServer('http://localhost:3000', 'Development Server')
     .addServer('https://api.example.com', 'Production Server')
     .build();

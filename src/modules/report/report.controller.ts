@@ -18,10 +18,19 @@ import { Roles } from '../../common/role/role.decorator';
 import { ROLES } from '../../common/role/role';
 import { Auth } from '../../common/auth/auth.decorator';
 import type { User } from '@prisma/client';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 
+@ApiTags('Admin - Reports')
+@ApiBearerAuth()
 @Controller('/api/admin/report')
 export class ReportController {
-  constructor(private reportService: ReportService) {}
+  constructor(private reportService: ReportService) { }
 
   /**
    * GET /api/admin/report/dashboard-summary?granularity=daily
@@ -30,6 +39,27 @@ export class ReportController {
   @Get('dashboard-summary')
   @HttpCode(HttpStatus.OK)
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiOperation({
+    summary: 'Get dashboard summary',
+    description:
+      'Get dashboard summary with aggregates and timeseries data. Granularity: daily, weekly, monthly, yearly.',
+  })
+  @ApiQuery({
+    name: 'granularity',
+    required: false,
+    enum: ['daily', 'weekly', 'monthly', 'yearly'],
+    description: 'Timeseries granularity (default: daily)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Dashboard summary retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/ReportDashboardSummaryResponse' },
+      },
+    },
+  })
   async getDashboardSummary(
     @Auth() admin: User,
     @Query('granularity') granularity: TimeseriesGranularity = 'daily',
@@ -43,6 +73,28 @@ export class ReportController {
    */
   @Get('export-csv')
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiOperation({
+    summary: 'Export CSV report',
+    description:
+      'Export posting credit purchase data as CSV for a given date range',
+  })
+  @ApiQuery({
+    name: 'from',
+    required: true,
+    type: String,
+    description: 'Start date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: true,
+    type: String,
+    description: 'End date (YYYY-MM-DD)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'CSV file downloaded',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid date range' })
   async exportCsv(
     @Auth() admin: User,
     @Query() query: ReportDateRangeRequest,
