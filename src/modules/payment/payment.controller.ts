@@ -61,7 +61,7 @@ import { PaginationQueryDto } from '../../common/pagination.dto';
 @ApiTags('Payment & Wallet')
 @Controller('/api')
 export class PaymentController {
-  constructor(private paymentService: PaymentService) {}
+  constructor(private paymentService: PaymentService) { }
 
   @Post('/admin/wallets/balance-initial')
   @HttpCode(200)
@@ -759,6 +759,28 @@ export class PaymentController {
   @Post('/admin/posting-credit')
   @HttpCode(201)
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiTags('Admin - Posting Credits')
+  @ApiOperation({
+    summary: 'Create posting credit package',
+    description: 'Create a new posting credit package (Admin only)',
+  })
+  @ApiBody({ type: AddPostinCreditPackageRequest })
+  @ApiResponse({
+    status: 201,
+    description: 'Package created successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example: 'Paket Kredit Posting berhasil ditambahkan',
+        },
+        data: { $ref: '#/components/schemas/PostingPackageResponse' },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Validation error' })
   async createPostingCreditPackage(
     @Auth() admin: User,
     @Body() request: AddPostinCreditPackageRequest,
@@ -773,6 +795,23 @@ export class PaymentController {
   @Get('/admin/posting-credit')
   @HttpCode(200)
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiTags('Admin - Posting Credits')
+  @ApiOperation({
+    summary: 'Get all posting credit packages (Admin)',
+    description:
+      'Get all posting credit packages including inactive ones (Admin only)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Packages retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/ListPostingPackageResponse' },
+      },
+    },
+  })
   async getPostingCreditPackages(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     @Auth() admin: User,
@@ -786,6 +825,26 @@ export class PaymentController {
   @Put('/admin/posting-credit/:id')
   @HttpCode(200)
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiTags('Admin - Posting Credits')
+  @ApiOperation({
+    summary: 'Edit posting credit package',
+    description: 'Update posting credit package by ID (Admin only)',
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Package ID' })
+  @ApiBody({ type: EditPostingCreditPackageRequest })
+  @ApiResponse({
+    status: 200,
+    description: 'Package updated',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Data id 1 berhasil diubah' },
+        data: { $ref: '#/components/schemas/PostingPackageResponse' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Package not found' })
   async editPostingCreditPackageById(
     @Auth() admin: User,
     @Param('id', ParseIntPipe) id: number,
@@ -804,6 +863,24 @@ export class PaymentController {
   @Delete('/admin/posting-credit/:id')
   @HttpCode(200)
   @Roles([ROLES.ADMIN, ROLES.SUPER_ADMIN])
+  @ApiBearerAuth()
+  @ApiTags('Admin - Posting Credits')
+  @ApiOperation({
+    summary: 'Delete posting credit package',
+    description: 'Delete posting credit package by ID (Admin only)',
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Package ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Package deleted',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Package deleted successfully' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Package not found' })
   async deletePostingCreditPackageById(
     @Auth() admin: User,
     @Param('id', ParseIntPipe) id: number,
@@ -817,6 +894,23 @@ export class PaymentController {
   @Get('/credits')
   @HttpCode(200)
   @Roles([ROLES.PEMBERI_KERJA])
+  @ApiBearerAuth()
+  @ApiTags('Posting Credits')
+  @ApiOperation({
+    summary: 'Get credit balance',
+    description:
+      'Get current posting credit balance (free quota + paid credits) for logged-in job provider',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Credit balance retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/CreditBalanceResponse' },
+      },
+    },
+  })
   async getCreditByUserId(
     @Auth() user: User,
   ): Promise<WebResponse<CreditBalanceResponse>> {
@@ -829,6 +923,23 @@ export class PaymentController {
   @Get('/credits/posting-credit')
   @HttpCode(200)
   @Roles([ROLES.PEMBERI_KERJA])
+  @ApiBearerAuth()
+  @ApiTags('Posting Credits')
+  @ApiOperation({
+    summary: 'Get available posting credit packages',
+    description:
+      'Get all active posting credit packages available for purchase (Job Provider only)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Available packages retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: '#/components/schemas/ListPostingPackageResponse' },
+      },
+    },
+  })
   async getPostingCreditPackagesGeneral(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     @Auth() admin: User,
@@ -842,6 +953,38 @@ export class PaymentController {
   @Post('/credits/topup')
   @HttpCode(200)
   @Roles([ROLES.PEMBERI_KERJA])
+  @ApiBearerAuth()
+  @ApiTags('Posting Credits')
+  @ApiOperation({
+    summary: 'Purchase posting credits',
+    description:
+      'Create a credit purchase transaction via Midtrans. Returns payment link.',
+  })
+  @ApiBody({ type: TopupCreditRequest })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment link created',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example: 'Silahkan selesaikan pembayaran kredit posting',
+        },
+        data: {
+          type: 'object',
+          properties: {
+            token: { type: 'string', example: 'snap-token-here' },
+            redirect_url: {
+              type: 'string',
+              example: 'https://app.midtrans.com/snap/v2/...',
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Package not found' })
   async topupCredit(
     @Auth() user: User,
     @Body() request: TopupCreditRequest,
@@ -859,6 +1002,22 @@ export class PaymentController {
 
   @Post('/webhook/midtrans')
   @HttpCode(200)
+  @ApiTags('Posting Credits')
+  @ApiOperation({
+    summary: 'Midtrans credit webhook',
+    description: 'Handle Midtrans credit payment callback (Midtrans only)',
+  })
+  @ApiBody({ type: TopupCallbackRequest })
+  @ApiResponse({
+    status: 200,
+    description: 'Callback processed',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'OK' },
+      },
+    },
+  })
   async midtransCreditCallback(@Body() body: TopupCallbackRequest) {
     console.log('Midtrans callback received:', body);
     await this.paymentService.handleCallbackCredit(body);
@@ -868,6 +1027,40 @@ export class PaymentController {
   @Get('/credits/history')
   @HttpCode(200)
   @Roles([ROLES.PEMBERI_KERJA])
+  @ApiBearerAuth()
+  @ApiTags('Posting Credits')
+  @ApiOperation({
+    summary: 'Get credit purchase history',
+    description:
+      'Get posting credit purchase history for logged-in job provider with pagination',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'size',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Purchase history retrieved',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'array',
+          items: {
+            $ref: '#/components/schemas/PostingCreditPurchaseResponse',
+          },
+        },
+      },
+    },
+  })
   async getPurchases(
     @Auth() user: User,
     @Query() query: PaginationQueryDto,
