@@ -5,7 +5,7 @@ import bcrypt from 'bcrypt';
 
 @Injectable()
 export class TestService {
-  constructor(private prismaService: PrismaService) {}
+  constructor(private prismaService: PrismaService) { }
 
   async disconnect() {
     await this.prismaService.$disconnect();
@@ -15,6 +15,7 @@ export class TestService {
     await this.prismaService.withdrawRequest.deleteMany();
     await this.prismaService.withdrawMethod.deleteMany();
 
+    await this.prismaService.review.deleteMany();
     await this.prismaService.jobApplication.deleteMany();
     await this.prismaService.job.deleteMany();
 
@@ -23,6 +24,7 @@ export class TestService {
 
     await this.prismaService.refreshToken.deleteMany();
     await this.prismaService.userPhotos.deleteMany();
+    await this.prismaService.userPostingQuota.deleteMany();
     await this.prismaService.user.deleteMany({
       where: {
         NOT: {
@@ -88,6 +90,11 @@ export class TestService {
         user_id: user.id,
       },
     });
+    await this.prismaService.userPostingQuota.create({
+      data: {
+        user_id: user.id,
+      },
+    });
     return user.id;
   }
 
@@ -107,6 +114,11 @@ export class TestService {
         user_id: user.id,
       },
     });
+    await this.prismaService.userPostingQuota.create({
+      data: {
+        user_id: user.id,
+      },
+    });
     return user.id;
   }
 
@@ -117,7 +129,9 @@ export class TestService {
         title: 'Test Job Posting',
         description:
           'This is a test job description with enough characters to pass validation',
-        location: 'Jakarta',
+        location_label: 'Jakarta',
+        job_latitude: -6.2,
+        job_longitude: 106.816666,
         compensation_amount: 10000000,
         status: 'OPEN',
         completed_at: new Date(),
@@ -131,7 +145,7 @@ export class TestService {
     details: {
       title: string;
       description: string;
-      location?: string;
+      location_label?: string;
       compensation_amount: number;
     },
   ) {
@@ -140,7 +154,9 @@ export class TestService {
         provider_id: providerId,
         title: details.title,
         description: details.description,
-        location: details.location,
+        location_label: details.location_label || 'Jakarta',
+        job_latitude: -6.2,
+        job_longitude: 106.816666,
         compensation_amount: details.compensation_amount,
         status: 'OPEN',
         completed_at: new Date(),

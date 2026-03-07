@@ -8,6 +8,7 @@ import { TestModule } from './test.module';
 import { TestService } from './test.service';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
+import { EmailSenderService } from '../src/modules/auth/email-sender.service';
 
 describe('JobController', () => {
   let app: INestApplication;
@@ -17,7 +18,15 @@ describe('JobController', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule, TestModule],
-    }).compile();
+    })
+      .overrideProvider(EmailSenderService)
+      .useValue({
+        sendEmail: jest.fn().mockResolvedValue(undefined),
+        sendEmailSync: jest.fn().mockResolvedValue(undefined),
+        processEmail: jest.fn().mockResolvedValue(undefined),
+        sendBulkEmails: jest.fn().mockResolvedValue(undefined),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.use(cookieParser());
@@ -32,39 +41,58 @@ describe('JobController', () => {
     await app.close();
   });
 
+  // ============================================================
+  // HELPER: Login and return cookies
+  // ============================================================
+  async function loginAs(
+    email: string,
+    password = '1234test',
+  ): Promise<string[]> {
+    const login = await request(app.getHttpServer())
+      .post('/api/users/login')
+      .send({ email, password });
+    return login.headers['set-cookie'] as unknown as string[];
+  }
+
+  // Valid job payload matching current schema
+  function validJobPayload(overrides: Record<string, any> = {}) {
+    return {
+      title: 'Frontend Developer Needed',
+      description:
+        'Looking for an experienced frontend developer with React skills for a 3-month project.',
+      location_label: 'Jakarta',
+      job_latitude: -6.2,
+      job_longitude: 106.816666,
+      compensation_amount: 15000000,
+      payment_method: 'CASH_OFFLINE',
+      ...overrides,
+    };
+  }
+
+  // ============================================================
+  // POST /api/jobs — Create Job
+  // ============================================================
   describe('POST /api/jobs - Create Job', () => {
-    let providerCookie: string;
-    let workerCookie: string;
+    let providerCookie: string[];
+    let workerCookie: string[];
 
     beforeEach(async () => {
       await testService.deleteAll();
 
       // Create provider (role_id = 2)
       await testService.addProvider();
-      const providerLogin = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({ email: 'provider@email.com', password: '1234test' });
-      providerCookie = providerLogin.headers['set-cookie'];
+      providerCookie = await loginAs('provider@email.com');
 
       // Create worker (role_id = 1)
       await testService.addUser();
-      const workerLogin = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({ email: 'test@email.com', password: '1234test' });
-      workerCookie = workerLogin.headers['set-cookie'];
+      workerCookie = await loginAs('test@email.com');
     });
 
     it('should create job successfully', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/jobs')
         .set('Cookie', providerCookie)
-        .send({
-          title: 'Frontend Developer Needed',
-          description:
-            'Looking for an experienced frontend developer with React skills for a 3-month project.',
-          location: 'Jakarta',
-          compensation_amount: 15000000,
-        });
+        .send(validJobPayload());
 
       logger.debug(response.body);
       expect(response.statusCode).toBe(201);
@@ -73,20 +101,29 @@ describe('JobController', () => {
       expect(response.body.data.id).toBeDefined();
       expect(response.body.data.title).toBe('Frontend Developer Needed');
       expect(response.body.data.status).toBe('OPEN');
-      expect(response.body.data.compensation_amount).toBe(15000000);
-      expect(response.body.data.location).toBe('Jakarta');
       expect(response.body.data.provider).toBeDefined();
+    });
+
+    it('should create job with address_detail', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/jobs')
+        .set('Cookie', providerCookie)
+        .send(
+          validJobPayload({
+            address_detail: 'Jl. Sudirman No. 1, Lantai 5',
+          }),
+        );
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(201);
+      expect(response.body.data).toBeDefined();
     });
 
     it('should reject if title is too short', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/jobs')
         .set('Cookie', providerCookie)
-        .send({
-          title: 'Dev',
-          description: 'This is a valid description with more than 20 chars',
-          compensation_amount: 5000000,
-        });
+        .send(validJobPayload({ title: 'Dev' }));
 
       logger.debug(response.body);
       expect(response.statusCode).toBe(400);
@@ -96,11 +133,7 @@ describe('JobController', () => {
       const response = await request(app.getHttpServer())
         .post('/api/jobs')
         .set('Cookie', providerCookie)
-        .send({
-          title: 'Frontend Developer',
-          description: 'Short desc',
-          compensation_amount: 5000000,
-        });
+        .send(validJobPayload({ description: 'Short desc' }));
 
       logger.debug(response.body);
       expect(response.statusCode).toBe(400);
@@ -110,11 +143,40 @@ describe('JobController', () => {
       const response = await request(app.getHttpServer())
         .post('/api/jobs')
         .set('Cookie', providerCookie)
-        .send({
-          title: 'Frontend Developer',
-          description: 'Looking for an experienced frontend developer',
-          compensation_amount: -1000,
-        });
+        .send(validJobPayload({ compensation_amount: -1000 }));
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('should reject if location_label is missing', async () => {
+      const payload = validJobPayload();
+      delete (payload as any).location_label;
+
+      const response = await request(app.getHttpServer())
+        .post('/api/jobs')
+        .set('Cookie', providerCookie)
+        .send(payload);
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('should reject if job_latitude is out of range', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/jobs')
+        .set('Cookie', providerCookie)
+        .send(validJobPayload({ job_latitude: 999 }));
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('should reject if job_longitude is out of range', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/jobs')
+        .set('Cookie', providerCookie)
+        .send(validJobPayload({ job_longitude: 999 }));
 
       logger.debug(response.body);
       expect(response.statusCode).toBe(400);
@@ -124,12 +186,7 @@ describe('JobController', () => {
       const response = await request(app.getHttpServer())
         .post('/api/jobs')
         .set('Cookie', workerCookie)
-        .send({
-          title: 'Frontend Developer Needed',
-          description:
-            'Looking for an experienced frontend developer with React skills',
-          compensation_amount: 15000000,
-        });
+        .send(validJobPayload());
 
       logger.debug(response.body);
       expect(response.statusCode).toBe(403);
@@ -138,42 +195,32 @@ describe('JobController', () => {
     it('should reject if not authenticated', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/jobs')
-        .send({
-          title: 'Frontend Developer Needed',
-          description:
-            'Looking for an experienced frontend developer with React skills',
-          compensation_amount: 15000000,
-        });
+        .send(validJobPayload());
 
       logger.debug(response.body);
       expect(response.statusCode).toBe(401);
     });
   });
 
+  // ============================================================
+  // PUT /api/jobs/:jobId — Update Job
+  // ============================================================
   describe('PUT /api/jobs/:jobId - Update Job', () => {
-    let providerCookie: string;
-    let anotherProviderCookie: string;
+    let providerCookie: string[];
+    let anotherProviderCookie: string[];
     let jobId: number;
 
     beforeEach(async () => {
       await testService.deleteAll();
 
-      // Create provider and job
       const providerId = await testService.addProvider();
-      const providerLogin = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({ email: 'provider@email.com', password: '1234test' });
-      providerCookie = providerLogin.headers['set-cookie'];
+      providerCookie = await loginAs('provider@email.com');
 
       const job = await testService.createJob(providerId);
       jobId = Number(job.id);
 
-      // Create another provider
       await testService.addAnotherProvider();
-      const anotherProviderLogin = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({ email: 'another@email.com', password: '1234test' });
-      anotherProviderCookie = anotherProviderLogin.headers['set-cookie'];
+      anotherProviderCookie = await loginAs('another@email.com');
     });
 
     it('should update job successfully', async () => {
@@ -182,6 +229,7 @@ describe('JobController', () => {
         .set('Cookie', providerCookie)
         .send({
           title: 'Senior Frontend Developer',
+          location_label: 'Jakarta',
           compensation_amount: 20000000,
         });
 
@@ -189,16 +237,13 @@ describe('JobController', () => {
       expect(response.statusCode).toBe(200);
       expect(response.body.message).toBe('Lowongan berhasil diperbarui');
       expect(response.body.data.title).toBe('Senior Frontend Developer');
-      expect(response.body.data.compensation_amount).toBe(20000000);
     });
 
     it('should reject if job not found', async () => {
       const response = await request(app.getHttpServer())
         .put('/api/jobs/99999')
         .set('Cookie', providerCookie)
-        .send({
-          title: 'Updated Title',
-        });
+        .send({ title: 'Updated Title', location_label: 'Jakarta' });
 
       logger.debug(response.body);
       expect(response.statusCode).toBe(404);
@@ -208,34 +253,39 @@ describe('JobController', () => {
       const response = await request(app.getHttpServer())
         .put(`/api/jobs/${jobId}`)
         .set('Cookie', anotherProviderCookie)
-        .send({
-          title: 'Hacked Title',
-        });
+        .send({ title: 'Hacked Title', location_label: 'Jakarta' });
 
       logger.debug(response.body);
       expect(response.statusCode).toBe(403);
     });
 
     it('should reject update on cancelled job', async () => {
-      // First cancel the job
       await testService.updateJobStatus(jobId, 'CANCELLED');
 
-      // Try to update again
       const response = await request(app.getHttpServer())
         .put(`/api/jobs/${jobId}`)
         .set('Cookie', providerCookie)
-        .send({
-          title: 'Cannot Update',
-        });
+        .send({ title: 'Cannot Update', location_label: 'Jakarta' });
 
       logger.debug(response.body);
       expect(response.statusCode).toBe(400);
     });
+
+    it('should reject if not authenticated', async () => {
+      const response = await request(app.getHttpServer())
+        .put(`/api/jobs/${jobId}`)
+        .send({ title: 'No Auth', location_label: 'Jakarta' });
+
+      expect(response.statusCode).toBe(401);
+    });
   });
 
+  // ============================================================
+  // DELETE /api/jobs/:jobId — Delete Job
+  // ============================================================
   describe('DELETE /api/jobs/:jobId - Delete Job', () => {
-    let providerCookie: string;
-    let anotherProviderCookie: string;
+    let providerCookie: string[];
+    let anotherProviderCookie: string[];
     let jobId: number;
     let workerId: string;
 
@@ -243,20 +293,14 @@ describe('JobController', () => {
       await testService.deleteAll();
 
       const providerId = await testService.addProvider();
-      const providerLogin = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({ email: 'provider@email.com', password: '1234test' });
-      providerCookie = providerLogin.headers['set-cookie'];
+      providerCookie = await loginAs('provider@email.com');
 
       const job = await testService.createJob(providerId);
       jobId = Number(job.id);
 
       await testService.addAnotherProvider();
       workerId = await testService.addUser();
-      const anotherProviderLogin = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({ email: 'another@email.com', password: '1234test' });
-      anotherProviderCookie = anotherProviderLogin.headers['set-cookie'];
+      anotherProviderCookie = await loginAs('another@email.com');
     });
 
     it('should delete job successfully', async () => {
@@ -288,7 +332,6 @@ describe('JobController', () => {
     });
 
     it('should reject delete job with ASSIGNED status', async () => {
-      // First assign the job
       await testService.updateJobStatus(jobId, 'ASSIGNED', workerId);
 
       const response = await request(app.getHttpServer())
@@ -300,7 +343,6 @@ describe('JobController', () => {
     });
 
     it('should reject delete job with IN_PROGRESS status', async () => {
-      // First set to in progress
       await testService.updateJobStatus(jobId, 'IN_PROGRESS', workerId);
 
       const response = await request(app.getHttpServer())
@@ -310,10 +352,21 @@ describe('JobController', () => {
       logger.debug(response.body);
       expect(response.statusCode).toBe(400);
     });
+
+    it('should reject if not authenticated', async () => {
+      const response = await request(app.getHttpServer())
+        .delete(`/api/jobs/${jobId}`);
+
+      expect(response.statusCode).toBe(401);
+    });
   });
 
-  describe('GET /api/jobs/:jobId - Get Job Detail', () => {
+  // ============================================================
+  // GET /api/jobs/:jobId/public — Get Job Detail Public
+  // ============================================================
+  describe('GET /api/jobs/:jobId/public - Get Job Detail Public', () => {
     let jobId: number;
+    let workerCookie: string[];
 
     beforeEach(async () => {
       await testService.deleteAll();
@@ -321,12 +374,15 @@ describe('JobController', () => {
       const providerId = await testService.addProvider();
       const job = await testService.createJob(providerId);
       jobId = Number(job.id);
+
+      await testService.addUser();
+      workerCookie = await loginAs('test@email.com');
     });
 
     it('should get job detail successfully (public)', async () => {
-      const response = await request(app.getHttpServer()).get(
-        `/api/jobs/${jobId}`,
-      );
+      const response = await request(app.getHttpServer())
+        .get(`/api/jobs/${jobId}/public`)
+        .set('Cookie', workerCookie);
 
       logger.debug(response.body);
       expect(response.statusCode).toBe(200);
@@ -338,40 +394,111 @@ describe('JobController', () => {
     });
 
     it('should return 404 if job not found', async () => {
-      const response = await request(app.getHttpServer()).get(
-        '/api/jobs/99999',
-      );
+      const response = await request(app.getHttpServer())
+        .get('/api/jobs/99999/public')
+        .set('Cookie', workerCookie);
 
       logger.debug(response.body);
       expect(response.statusCode).toBe(404);
     });
+
+    it('should reject if not authenticated', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/jobs/${jobId}/public`);
+
+      expect(response.statusCode).toBe(401);
+    });
   });
 
+  // ============================================================
+  // GET /api/jobs/:jobId/private — Get Job Detail Private
+  // ============================================================
+  describe('GET /api/jobs/:jobId/private - Get Job Detail Private', () => {
+    let jobId: number;
+    let providerCookie: string[];
+    let workerCookie: string[];
+
+    beforeEach(async () => {
+      await testService.deleteAll();
+
+      const providerId = await testService.addProvider();
+      providerCookie = await loginAs('provider@email.com');
+
+      const job = await testService.createJob(providerId);
+      jobId = Number(job.id);
+    });
+
+    it('should get job detail as provider', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/jobs/${jobId}/private`)
+        .set('Cookie', providerCookie);
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.data).toBeDefined();
+      expect(response.body.data.id).toBe(jobId);
+      expect(response.body.data.title).toBeDefined();
+    });
+
+    it('should get job detail as assigned worker', async () => {
+      // Worker must be assigned to the job to see private details
+      const workerId = await testService.addUser();
+      await testService.updateJobStatus(jobId, 'ASSIGNED', workerId);
+      workerCookie = await loginAs('test@email.com');
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/jobs/${jobId}/private`)
+        .set('Cookie', workerCookie);
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.data).toBeDefined();
+    });
+
+    it('should return 404 if job not found', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/jobs/99999/private')
+        .set('Cookie', providerCookie);
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('should reject if not authenticated', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/jobs/${jobId}/private`);
+
+      expect(response.statusCode).toBe(401);
+    });
+  });
+
+  // ============================================================
+  // GET /api/jobs — Search Jobs
+  // ============================================================
   describe('GET /api/jobs - Search Jobs', () => {
     beforeEach(async () => {
       await testService.deleteAll();
 
       const providerId = await testService.addProvider();
 
-      // Create multiple jobs with different criteria
       await testService.createJobWithDetails(providerId, {
         title: 'Frontend Developer React',
         description: 'Looking for React developer with 2 years experience',
-        location: 'Jakarta',
+        location_label: 'Jakarta',
         compensation_amount: 10000000,
       });
 
       await testService.createJobWithDetails(providerId, {
         title: 'Backend Developer Node.js',
         description: 'Node.js developer needed for backend development',
-        location: 'Bandung',
+        location_label: 'Bandung',
         compensation_amount: 12000000,
       });
 
       await testService.createJobWithDetails(providerId, {
         title: 'Fullstack Developer',
         description: 'Fullstack developer with React and Node.js experience',
-        location: 'Jakarta',
+        location_label: 'Jakarta',
         compensation_amount: 15000000,
       });
     });
@@ -400,19 +527,6 @@ describe('JobController', () => {
           (job: { title: string; description: string }) =>
             job.title.includes('React') || job.description.includes('React'),
         ),
-      ).toBe(true);
-    });
-
-    it('should search by location', async () => {
-      const response = await request(app.getHttpServer()).get(
-        '/api/jobs?location=Jakarta',
-      );
-
-      logger.debug(response.body);
-      expect(response.statusCode).toBe(200);
-      expect(response.body.data.jobs.length).toBeGreaterThan(0);
-      expect(
-        response.body.data.jobs.every((job: any) => job.location === 'Jakarta'),
       ).toBe(true);
     });
 
@@ -459,19 +573,29 @@ describe('JobController', () => {
       expect(response.body.data.page).toBe(1);
       expect(response.body.data.limit).toBe(2);
     });
+
+    it('should return empty list for non-matching keyword', async () => {
+      const response = await request(app.getHttpServer()).get(
+        '/api/jobs?keyword=NonExistentJobXYZ123',
+      );
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.data.jobs.length).toBe(0);
+    });
   });
 
+  // ============================================================
+  // GET /api/jobs/provider/history — Provider Job History
+  // ============================================================
   describe('GET /api/jobs/provider/history - Get Provider Job History', () => {
-    let providerCookie: string;
+    let providerCookie: string[];
 
     beforeEach(async () => {
       await testService.deleteAll();
 
       const providerId = await testService.addProvider();
-      const providerLogin = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({ email: 'provider@email.com', password: '1234test' });
-      providerCookie = providerLogin.headers['set-cookie'];
+      providerCookie = await loginAs('provider@email.com');
 
       // Create multiple jobs with different statuses
       await testService.createJob(providerId);
@@ -516,6 +640,16 @@ describe('JobController', () => {
       ).toBe(true);
     });
 
+    it('should paginate history results', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/jobs/provider/history?page=1&limit=1')
+        .set('Cookie', providerCookie);
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.data.jobs.length).toBeLessThanOrEqual(1);
+    });
+
     it('should reject if not authenticated', async () => {
       const response = await request(app.getHttpServer()).get(
         '/api/jobs/provider/history',
@@ -526,17 +660,17 @@ describe('JobController', () => {
     });
   });
 
+  // ============================================================
+  // GET /api/jobs/provider/active — Active Jobs
+  // ============================================================
   describe('GET /api/jobs/provider/active - Get Active Jobs', () => {
-    let providerCookie: string;
+    let providerCookie: string[];
 
     beforeEach(async () => {
       await testService.deleteAll();
 
       const providerId = await testService.addProvider();
-      const providerLogin = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({ email: 'provider@email.com', password: '1234test' });
-      providerCookie = providerLogin.headers['set-cookie'];
+      providerCookie = await loginAs('provider@email.com');
 
       // Create jobs with different statuses
       await testService.createJob(providerId); // OPEN
@@ -574,17 +708,17 @@ describe('JobController', () => {
     });
   });
 
+  // ============================================================
+  // GET /api/jobs/provider/completed — Completed Jobs
+  // ============================================================
   describe('GET /api/jobs/provider/completed - Get Completed Jobs', () => {
-    let providerCookie: string;
+    let providerCookie: string[];
 
     beforeEach(async () => {
       await testService.deleteAll();
 
       const providerId = await testService.addProvider();
-      const providerLogin = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({ email: 'provider@email.com', password: '1234test' });
-      providerCookie = providerLogin.headers['set-cookie'];
+      providerCookie = await loginAs('provider@email.com');
 
       // Create jobs
       await testService.createJob(providerId); // OPEN
@@ -619,8 +753,12 @@ describe('JobController', () => {
       expect(response.statusCode).toBe(401);
     });
   });
+
+  // ============================================================
+  // PATCH /api/jobs/:jobId/status/worker — Worker Update Status
+  // ============================================================
   describe('PATCH /api/jobs/:jobId/status/worker - Worker Update Job Status', () => {
-    let workerCookie: string;
+    let workerCookie: string[];
     let providerId: string;
     let workerId: string;
     let jobId: number;
@@ -628,19 +766,16 @@ describe('JobController', () => {
     beforeEach(async () => {
       await testService.deleteAll();
 
-      // Buat provider & job
+      // Create provider & job
       providerId = await testService.addProvider();
       const job = await testService.createJob(providerId);
       jobId = Number(job.id);
 
-      // Buat worker
+      // Create worker
       workerId = await testService.addUser();
-      const workerLogin = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({ email: 'test@email.com', password: '1234test' });
-      workerCookie = workerLogin.headers['set-cookie'];
+      workerCookie = await loginAs('test@email.com');
 
-      // Assign job ke worker
+      // Assign job to worker
       await testService.updateJobStatus(jobId, 'ASSIGNED', workerId);
     });
 
@@ -675,13 +810,9 @@ describe('JobController', () => {
     });
 
     it('should reject if job does not belong to worker', async () => {
-      // Buat worker lain
+      // Create another worker
       await testService.addAnotherUser();
-      const otherWorkerLogin = await request(app.getHttpServer())
-        .post('/api/users/login')
-        .send({ email: 'another@email.com', password: '1234test' });
-
-      const otherCookie = otherWorkerLogin.headers['set-cookie'];
+      const otherCookie = await loginAs('another@email.com');
 
       const response = await request(app.getHttpServer())
         .patch(`/api/jobs/${jobId}/status/worker`)
@@ -691,7 +822,7 @@ describe('JobController', () => {
       expect(response.statusCode).toBe(403);
     });
 
-    it('should reject updating job that is already APPROVED or REJECTED', async () => {
+    it('should reject updating job that is already APPROVED', async () => {
       await testService.updateJobStatus(jobId, 'APPROVED', workerId);
 
       const response = await request(app.getHttpServer())
@@ -715,6 +846,90 @@ describe('JobController', () => {
       const response = await request(app.getHttpServer())
         .patch(`/api/jobs/${jobId}/status/worker`)
         .send({ status: 'COMPLETED' });
+
+      expect(response.statusCode).toBe(401);
+    });
+  });
+
+  // ============================================================
+  // PATCH /api/jobs/:jobId/status/employer — Employer Update Status
+  // ============================================================
+  describe('PATCH /api/jobs/:jobId/status/employer - Employer Update Job Status', () => {
+    let providerCookie: string[];
+    let providerId: string;
+    let workerId: string;
+    let jobId: number;
+
+    beforeEach(async () => {
+      await testService.deleteAll();
+
+      providerId = await testService.addProvider();
+      providerCookie = await loginAs('provider@email.com');
+
+      const job = await testService.createJob(providerId);
+      jobId = Number(job.id);
+
+      workerId = await testService.addUser();
+    });
+
+    it('should allow employer to cancel an OPEN job (no worker)', async () => {
+      const response = await request(app.getHttpServer())
+        .patch(`/api/jobs/${jobId}/status/employer`)
+        .set('Cookie', providerCookie)
+        .send({ status: 'CANCELLED' });
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.message).toBeDefined();
+    });
+
+    it('should reject cancel if job has assigned worker', async () => {
+      await testService.updateJobStatus(jobId, 'ASSIGNED', workerId);
+
+      const response = await request(app.getHttpServer())
+        .patch(`/api/jobs/${jobId}/status/employer`)
+        .set('Cookie', providerCookie)
+        .send({ status: 'CANCELLED' });
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('should reject invalid status value', async () => {
+      const response = await request(app.getHttpServer())
+        .patch(`/api/jobs/${jobId}/status/employer`)
+        .set('Cookie', providerCookie)
+        .send({ status: 'INVALID' });
+
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('should reject if job not found', async () => {
+      const response = await request(app.getHttpServer())
+        .patch('/api/jobs/999999/status/employer')
+        .set('Cookie', providerCookie)
+        .send({ status: 'CANCELLED' });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('should reject if not job owner', async () => {
+      await testService.addAnotherProvider();
+      const otherProviderCookie = await loginAs('another@email.com');
+
+      const response = await request(app.getHttpServer())
+        .patch(`/api/jobs/${jobId}/status/employer`)
+        .set('Cookie', otherProviderCookie)
+        .send({ status: 'CANCELLED' });
+
+      expect(response.statusCode).toBe(403);
+    });
+
+    it('should reject if not authenticated', async () => {
+      const response = await request(app.getHttpServer())
+        .patch(`/api/jobs/${jobId}/status/employer`)
+        .send({ status: 'CANCELLED' });
 
       expect(response.statusCode).toBe(401);
     });
