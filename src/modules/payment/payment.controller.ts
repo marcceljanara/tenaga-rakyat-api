@@ -144,29 +144,31 @@ export class PaymentController {
     };
   }
 
-  @Post('/webhook/midtrans')
-  @HttpCode(200)
-  @ApiOperation({
-    summary: 'Midtrans webhook',
-    description: 'Handle Midtrans payment callback (Midtrans only)',
-  })
-  @ApiBody({ type: TopupCallbackRequest })
-  @ApiResponse({
-    status: 200,
-    description: 'Callback processed',
-    schema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string', example: 'OK' },
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Invalid signature' })
-  async midtransCallback(@Body() body: TopupCallbackRequest) {
-    console.log('Midtrans callback received:', body);
-    await this.paymentService.handleCallback(body);
-    return { message: 'OK' };
-  }
+  // Not Implement
+  // @Post('/webhook/midtrans')
+  // @HttpCode(200)
+  // @ApiTags('Payment & Wallet', 'Posting Credits')
+  // @ApiOperation({
+  //   summary: 'Midtrans webhook (Wallet & Credit)',
+  //   description: 'Handle Midtrans payment callback for wallet top-up and posting credit purchase (Midtrans only)',
+  // })
+  // @ApiBody({ type: TopupCallbackRequest })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'Callback processed',
+  //   schema: {
+  //     type: 'object',
+  //     properties: {
+  //       message: { type: 'string', example: 'OK' },
+  //     },
+  //   },
+  // })
+  // @ApiResponse({ status: 401, description: 'Invalid signature' })
+  // async midtransCallback(@Body() body: TopupCallbackRequest) {
+  //   console.log('Midtrans callback received:', body);
+  //     await this.paymentService.handleCallback(body);
+  //   return { message: 'OK' };
+  // }
 
   @Get('/wallets')
   @HttpCode(200)
@@ -776,7 +778,18 @@ export class PaymentController {
           type: 'string',
           example: 'Paket Kredit Posting berhasil ditambahkan',
         },
-        data: { $ref: '#/components/schemas/PostingPackageResponse' },
+        data: {
+          $ref: '#/components/schemas/PostingPackageResponse',
+          example: {
+            id: 1,
+            name: 'Basic Package',
+            credit_amount: 10,
+            price: '50000.00',
+            is_active: true,
+            created_at: '2026-03-09T10:00:00Z',
+            updated_at: '2026-03-09T10:00:00Z',
+          },
+        },
       },
     },
   })
@@ -808,7 +821,22 @@ export class PaymentController {
     schema: {
       type: 'object',
       properties: {
-        data: { $ref: '#/components/schemas/ListPostingPackageResponse' },
+        data: {
+          $ref: '#/components/schemas/ListPostingPackageResponse',
+          example: {
+            packages: [
+              {
+                id: 1,
+                name: 'Basic Package',
+                credit_amount: 10,
+                price: '50000.00',
+                is_active: true,
+                created_at: '2026-03-09T10:00:00Z',
+                updated_at: '2026-03-09T10:00:00Z',
+              },
+            ],
+          },
+        },
       },
     },
   })
@@ -840,7 +868,18 @@ export class PaymentController {
       type: 'object',
       properties: {
         message: { type: 'string', example: 'Data id 1 berhasil diubah' },
-        data: { $ref: '#/components/schemas/PostingPackageResponse' },
+        data: {
+          $ref: '#/components/schemas/PostingPackageResponse',
+          example: {
+            id: 1,
+            name: 'Basic Package Update',
+            credit_amount: 15,
+            price: '60000.00',
+            is_active: true,
+            created_at: '2026-03-09T10:00:00Z',
+            updated_at: '2026-03-09T10:00:00Z',
+          },
+        },
       },
     },
   })
@@ -907,7 +946,13 @@ export class PaymentController {
     schema: {
       type: 'object',
       properties: {
-        data: { $ref: '#/components/schemas/CreditBalanceResponse' },
+        data: {
+          $ref: '#/components/schemas/CreditBalanceResponse',
+          example: {
+            free_quota: 5,
+            paid_credit: 10,
+          },
+        },
       },
     },
   })
@@ -936,7 +981,22 @@ export class PaymentController {
     schema: {
       type: 'object',
       properties: {
-        data: { $ref: '#/components/schemas/ListPostingPackageResponse' },
+        data: {
+          $ref: '#/components/schemas/ListPostingPackageResponse',
+          example: {
+            packages: [
+              {
+                id: 1,
+                name: 'Basic Package',
+                credit_amount: 10,
+                price: '50000.00',
+                is_active: true,
+                created_at: '2026-03-09T10:00:00Z',
+                updated_at: '2026-03-09T10:00:00Z',
+              },
+            ],
+          },
+        },
       },
     },
   })
@@ -1056,6 +1116,24 @@ export class PaymentController {
           type: 'array',
           items: {
             $ref: '#/components/schemas/PostingCreditPurchaseResponse',
+          },
+          example: [
+            {
+              paid_at: '2026-03-09T10:00:00Z',
+              payment_reference: 'order-id-123',
+              status: 'COMPLETED',
+              credit_amount: 10,
+              total_price: '50000.00',
+            },
+          ],
+        },
+        paging: {
+          type: 'object',
+          example: {
+            size: 10,
+            total_page: 5,
+            current_page: 1,
+            total_data: 50,
           },
         },
       },

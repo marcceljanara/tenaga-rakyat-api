@@ -326,44 +326,84 @@ export class WithdrawPreviewResponse {
 }
 
 export class TopupCreditRequest {
+  @ApiProperty({ example: 1, description: 'Package ID to purchase' })
   package_id: number;
 }
 
 export class CreditBalanceResponse {
+  @ApiProperty({ example: 5, description: 'Free quota balance' })
   free_quota: number;
+
+  @ApiProperty({ example: 10, description: 'Paid credit balance' })
   paid_credit: number;
 }
 
 export class PostingPackageResponse {
+  @ApiProperty({ example: 1 })
+  id: number;
+
+  @ApiProperty({ example: 'Basic Package' })
   name: string;
+
+  @ApiProperty({ example: 10 })
   credit_amount: number;
+
+  @ApiProperty({ type: 'string', example: '50000.00' })
   price: Decimal;
+
+  @ApiPropertyOptional({ example: true })
   is_active?: boolean;
+
+  @ApiPropertyOptional()
   created_at?: Date;
+
+  @ApiPropertyOptional()
   updated_at?: Date;
 }
 
 export class ListPostingPackageResponse {
+  @ApiProperty({ type: [PostingPackageResponse] })
   packages: PostingPackageResponse[];
 }
 
 export class AddPostinCreditPackageRequest {
+  @ApiProperty({ example: 'Basic Package', description: 'Package name' })
   name: string;
+
+  @ApiProperty({ example: 10, description: 'Credit amount' })
   credit_amount: number;
+
+  @ApiProperty({ example: 50000, description: 'Price in IDR' })
   price: number;
 }
 
 export class EditPostingCreditPackageRequest {
+  @ApiProperty({ example: 'Basic Package Update', description: 'Package name' })
   name: string;
+
+  @ApiProperty({ example: 15, description: 'Credit amount' })
   credit_amount: number;
+
+  @ApiProperty({ example: 60000, description: 'Price in IDR' })
   price: number;
+
+  @ApiProperty({ example: true, description: 'Is package active' })
   is_active: boolean;
 }
 
 export class PostingCreditPurchaseResponse {
+  @ApiPropertyOptional({ description: 'Payment date' })
   paid_at: Date | null;
+
+  @ApiProperty({ example: 'order-id-123', description: 'Midtrans Order ID' })
   payment_reference: string;
+
+  @ApiProperty({ example: 'COMPLETED', description: 'Transaction status' })
   status: string;
+
+  @ApiProperty({ example: 10, description: 'Credit amount purchased' })
   credit_amount: number;
+
+  @ApiProperty({ type: 'string', example: '50000.00' })
   total_price: Decimal;
 }
