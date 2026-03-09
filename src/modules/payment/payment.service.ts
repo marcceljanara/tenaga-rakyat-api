@@ -57,7 +57,7 @@ export class PaymentService {
     @Inject(WINSTON_MODULE_PROVIDER) private logger: Logger,
     private prismaService: PrismaService,
     private midtransService: MidtransService,
-  ) {}
+  ) { }
 
   // ============================================================
   // EXISTING METHODS (Wallet & Topup)
@@ -142,13 +142,24 @@ export class PaymentService {
     }
 
     const orderId: number = Number(body.order_id);
+    const grossAmount: number = Number(body.gross_amount);
+
     if (body.transaction_status === 'settlement') {
-      await this.completeTopup(orderId);
+      await this.completeTopup(orderId, grossAmount);
+    } else if (
+      body.transaction_status === 'cancel' ||
+      body.transaction_status === 'deny' ||
+      body.transaction_status === 'expire'
+    ) {
+      await this.prismaService.transaction.updateMany({
+        where: { id: orderId, status: TransactonStatus.PENDING },
+        data: { status: TransactonStatus.FAILED },
+      });
     }
     return { success: true };
   }
 
-  async completeTopup(orderId: number) {
+  async completeTopup(orderId: number, grossAmount: number) {
     await this.prismaService.$transaction(async (tx) => {
       const trx = await tx.transaction.findUnique({
         where: { id: Number(orderId) },
@@ -156,15 +167,20 @@ export class PaymentService {
 
       if (!trx) throw new Error('Transaction not found');
       if (trx.status === TransactonStatus.COMPLETED) return;
+      if (Number(trx.amount) !== grossAmount) {
+        throw new Error('Transaction amount mismatch');
+      }
+
+      const updatedTrx = await tx.transaction.updateMany({
+        where: { id: orderId, status: TransactonStatus.PENDING },
+        data: { status: TransactonStatus.COMPLETED },
+      });
+
+      if (updatedTrx.count === 0) return;
 
       await tx.wallet.update({
         where: { id: Number(trx.destination_wallet_id) },
         data: { balance: { increment: trx.amount } },
-      });
-
-      await tx.transaction.update({
-        where: { id: orderId },
-        data: { status: TransactonStatus.COMPLETED },
       });
     });
   }
@@ -330,31 +346,38 @@ export class PaymentService {
       );
     }
 
-    // Check wallet balance
-    const wallet = await this.prismaService.wallet.findUnique({
-      where: { user_id: userId },
-    });
-
-    if (!wallet) {
-      throw new HttpException('Wallet tidak ditemukan', 404);
-    }
-
-    if (wallet.balance.lessThan(userRequest.amount)) {
-      throw new HttpException('Saldo tidak mencukupi', 400);
-    }
-
     // Create withdraw request in transaction
     const withdrawRequest = await this.prismaService.$transaction(
       async (tx) => {
+        // Check wallet balance
+        const wallet = await tx.wallet.findUnique({
+          where: { user_id: userId },
+        });
+
+        if (!wallet) {
+          throw new HttpException('Wallet tidak ditemukan', 404);
+        }
+
+        if (wallet.balance.lessThan(userRequest.amount)) {
+          throw new HttpException('Saldo tidak mencukupi', 400);
+        }
+
         // Deduct balance from wallet
-        await tx.wallet.update({
-          where: { id: wallet.id },
+        const updatedWallet = await tx.wallet.updateMany({
+          where: {
+            id: wallet.id,
+            balance: { gte: userRequest.amount }
+          },
           data: {
             balance: {
               decrement: userRequest.amount,
             },
           },
         });
+
+        if (updatedWallet.count === 0) {
+          throw new HttpException('Saldo tidak mencukupi', 400);
+        }
 
         // Create transaction record
         await tx.transaction.create({
@@ -898,7 +921,7 @@ export class PaymentService {
     if (withdrawRequest.status !== WithdrawStatus.APPROVED) {
       throw new HttpException(
         `Request tidak bisa di-send. Status saat ini: ${withdrawRequest.status}. ` +
-          `Hanya request dengan status APPROVED yang bisa di-send.`,
+        `Hanya request dengan status APPROVED yang bisa di-send.`,
         400,
       );
     }
