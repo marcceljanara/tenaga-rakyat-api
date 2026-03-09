@@ -1289,7 +1289,9 @@ export class PaymentService {
     size: number = 10,
   ): Promise<WebResponse<PostingCreditPurchaseResponse[]>> {
     this.logger.debug(`Get posting credit purchase userId: ${userId}`);
-    const skip = (page - 1) * size;
+    const parsedPage = Number(page) || 1;
+    const parsedSize = Number(size) || 10;
+    const skip = (parsedPage - 1) * parsedSize;
     const [total, result] = await this.prismaService.$transaction([
       this.prismaService.postingCreditPurchase.count({
         where: {
@@ -1302,9 +1304,9 @@ export class PaymentService {
           user_id: userId,
         },
         skip,
-        take: size,
+        take: parsedSize,
         orderBy: {
-          paid_at: 'desc',
+          created_at: 'desc',
         },
         select: {
           paid_at: true,
@@ -1312,6 +1314,7 @@ export class PaymentService {
           status: true,
           credit_amount: true,
           total_price: true,
+          created_at: true,
         },
       }),
     ]);
@@ -1319,9 +1322,9 @@ export class PaymentService {
     return {
       data: result,
       paging: {
-        size,
-        total_page: Math.ceil(total / size),
-        current_page: page,
+        size: parsedSize,
+        total_page: Math.ceil(total / parsedSize),
+        current_page: parsedPage,
         total_data: total,
       },
     };
