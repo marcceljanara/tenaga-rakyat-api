@@ -8,11 +8,11 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ReportService } from './report.service';
-import type {
+import {
   ReportDashboardSummaryResponse,
   ReportDateRangeRequest,
-  TimeseriesGranularity,
 } from '../../model/report.model';
+import type { TimeseriesGranularity } from '../../model/report.model';
 import { WebResponse } from '../../model/web.model';
 import { Roles } from '../../common/role/role.decorator';
 import { ROLES } from '../../common/role/role';
@@ -24,10 +24,12 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
+  ApiExtraModels,
 } from '@nestjs/swagger';
 
 @ApiTags('Admin - Reports')
 @ApiBearerAuth()
+@ApiExtraModels(ReportDashboardSummaryResponse)
 @Controller('/api/admin/report')
 export class ReportController {
   constructor(private reportService: ReportService) { }
