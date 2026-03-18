@@ -17,7 +17,7 @@ export class ReportService {
     private validationService: ValidationService,
     @Inject(WINSTON_MODULE_PROVIDER) private logger: Logger,
     private prismaService: PrismaService,
-  ) {}
+  ) { }
 
   async getDashboardSummary(
     granularity: TimeseriesGranularity,
@@ -63,7 +63,7 @@ export class ReportService {
   private async getAggregates(): Promise<
     Omit<ReportDashboardSummaryResponse, 'timeseries'>
   > {
-    const [paid, pending, failed] = await Promise.all([
+    const [paid, pending, failed, users, jobs, applications] = await Promise.all([
       this.prismaService.postingCreditPurchase.aggregate({
         where: { status: 'PAID' },
         _count: true,
@@ -75,6 +75,9 @@ export class ReportService {
       this.prismaService.postingCreditPurchase.count({
         where: { status: { in: ['EXPIRED', 'FAILED'] } },
       }),
+      this.prismaService.user.count(),
+      this.prismaService.job.count(),
+      this.prismaService.jobApplication.count(),
     ]);
 
     return {
@@ -84,6 +87,9 @@ export class ReportService {
       paid_transactions: paid._count,
       pending_transactions: pending,
       failed_transactions: failed,
+      total_users: users,
+      total_jobs: jobs,
+      total_applications: applications,
     };
   }
 
@@ -100,30 +106,63 @@ export class ReportService {
 
     const format = formatMap[granularity];
 
-    const rows: Array<{
-      period: string;
-      total_transactions: bigint;
-      total_revenue: string;
-      total_credits: bigint;
-    }> = await this.prismaService.$queryRaw`
-      SELECT
-        TO_CHAR(paid_at, ${format})                 AS period,
-        COUNT(*)::bigint                            AS total_transactions,
-        COALESCE(SUM(total_price), 0)::text         AS total_revenue,
-        COALESCE(SUM(credit_amount), 0)::bigint     AS total_credits
-      FROM posting_credit_purchase
-      WHERE status = 'PAID'
-        AND paid_at IS NOT NULL
-      GROUP BY period
-      ORDER BY period ASC
-    `;
+    const [transactions, users, jobs, applications] = await Promise.all([
+      this.prismaService.$queryRaw<Array<{ period: string, total_transactions: bigint, total_revenue: string, total_credits: bigint }>>`
+        SELECT TO_CHAR(paid_at, ${format}) AS period, COUNT(*)::bigint AS total_transactions, COALESCE(SUM(total_price), 0)::text AS total_revenue, COALESCE(SUM(credit_amount), 0)::bigint AS total_credits FROM posting_credit_purchase WHERE status = 'PAID' AND paid_at IS NOT NULL GROUP BY period
+      `,
+      this.prismaService.$queryRaw<Array<{ period: string, total_users: bigint }>>`
+        SELECT TO_CHAR(created_at, ${format}) AS period, COUNT(*)::bigint AS total_users FROM users WHERE created_at IS NOT NULL GROUP BY period
+      `,
+      this.prismaService.$queryRaw<Array<{ period: string, total_jobs: bigint }>>`
+        SELECT TO_CHAR(posted_at, ${format}) AS period, COUNT(*)::bigint AS total_jobs FROM jobs WHERE posted_at IS NOT NULL GROUP BY period
+      `,
+      this.prismaService.$queryRaw<Array<{ period: string, total_applications: bigint }>>`
+        SELECT TO_CHAR(created_at, ${format}) AS period, COUNT(*)::bigint AS total_applications FROM job_applications WHERE created_at IS NOT NULL GROUP BY period
+      `
+    ]);
 
-    return rows.map((row) => ({
-      period: row.period,
-      total_transactions: Number(row.total_transactions),
-      total_revenue: Number(row.total_revenue),
-      total_credits: Number(row.total_credits),
-    }));
+    const periodMap = new Map<string, ReportTimeseriesItem>();
+
+    const getOrAdd = (period: string) => {
+      if (!periodMap.has(period)) {
+        periodMap.set(period, {
+          period,
+          total_transactions: 0,
+          total_revenue: 0,
+          total_credits: 0,
+          total_users: 0,
+          total_jobs: 0,
+          total_applications: 0,
+        });
+      }
+      return periodMap.get(period)!;
+    };
+
+    transactions.forEach(row => {
+      const item = getOrAdd(row.period);
+      item.total_transactions = Number(row.total_transactions);
+      item.total_revenue = Number(row.total_revenue);
+      item.total_credits = Number(row.total_credits);
+    });
+
+    users.forEach(row => {
+      const item = getOrAdd(row.period);
+      item.total_users = Number(row.total_users);
+    });
+
+    jobs.forEach(row => {
+      const item = getOrAdd(row.period);
+      item.total_jobs = Number(row.total_jobs);
+    });
+
+    applications.forEach(row => {
+      const item = getOrAdd(row.period);
+      item.total_applications = Number(row.total_applications);
+    });
+
+    const result = Array.from(periodMap.values());
+    result.sort((a, b) => a.period.localeCompare(b.period));
+    return result;
   }
 
   private buildCsv(purchases: any[]): string {

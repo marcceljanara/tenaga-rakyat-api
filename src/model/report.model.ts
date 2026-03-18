@@ -20,6 +20,15 @@ export class ReportTimeseriesItem {
 
   @ApiProperty({ example: 50, description: 'Total credits sold in the period' })
   total_credits: number;
+
+  @ApiProperty({ example: 5, description: 'Total users registered in the period' })
+  total_users: number;
+
+  @ApiProperty({ example: 3, description: 'Total jobs posted in the period' })
+  total_jobs: number;
+
+  @ApiProperty({ example: 15, description: 'Total applications submitted in the period' })
+  total_applications: number;
 }
 
 export class ReportDashboardSummaryResponse {
@@ -40,6 +49,15 @@ export class ReportDashboardSummaryResponse {
 
   @ApiProperty({ example: 5, description: 'Number of failed transactions' })
   failed_transactions: number;
+
+  @ApiProperty({ example: 350, description: 'Total users registered overall' })
+  total_users: number;
+
+  @ApiProperty({ example: 210, description: 'Total jobs posted overall' })
+  total_jobs: number;
+
+  @ApiProperty({ example: 700, description: 'Total job applications submitted overall' })
+  total_applications: number;
 
   @ApiProperty({ type: [ReportTimeseriesItem], description: 'Timeseries data' })
   timeseries: ReportTimeseriesItem[];
