@@ -48,7 +48,14 @@ import { join } from 'path';
     ScheduleModule.forRoot(),
     ServeStaticModule.forRoot({
       serveRoot: '/uploads',
-      rootPath: join(process.cwd(), 'uploads'),
+      rootPath: join(process.cwd(), process.env.UPLOAD_DIR || 'uploads'),
+      serveStaticOptions: {
+        index: false,
+        setHeaders: (res, path, stat) => {
+          res.set('X-Content-Type-Options', 'nosniff');
+          res.set('Content-Security-Policy', "default-src 'none'");
+        },
+      },
     }),
   ],
   providers: [

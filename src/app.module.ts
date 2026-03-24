@@ -21,7 +21,14 @@ import { ReviewModule } from './modules/review/review.module';
     UserModule,
     UserPhotoModule,
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'uploads'),
+      rootPath: join(process.cwd(), process.env.UPLOAD_DIR || 'uploads'),
+      serveStaticOptions: {
+        index: false,
+        setHeaders: (res, path, stat) => {
+          res.set('X-Content-Type-Options', 'nosniff');
+          res.set('Content-Security-Policy', "default-src 'none'");
+        },
+      },
       serveRoot: '/uploads',
     }),
     ApplicationModule,
@@ -37,4 +44,4 @@ import { ReviewModule } from './modules/review/review.module';
   controllers: [],
   providers: [CronService],
 })
-export class AppModule {}
+export class AppModule { }
