@@ -10,6 +10,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { PaymentService } from './payment.service';
 import { Roles } from '../../common/role/role.decorator';
 import { ROLES } from '../../common/role/role';
@@ -59,6 +60,7 @@ import {
 import { PaginationQueryDto } from '../../common/pagination.dto';
 
 @ApiTags('Payment & Wallet')
+@Throttle({ default: { limit: 10, ttl: 60000 } })
 @Controller('/api')
 export class PaymentController {
   constructor(private paymentService: PaymentService) { }

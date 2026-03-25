@@ -11,6 +11,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { JobService } from './job.service';
 import {
   CreateJobRequest,
@@ -37,6 +38,7 @@ import {
 
 @ApiTags('Job Management')
 @ApiBearerAuth()
+@Throttle({ default: { limit: 30, ttl: 60000 } })
 @Controller('/api/jobs')
 export class JobController {
   constructor(private jobService: JobService) {}

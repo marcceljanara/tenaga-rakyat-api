@@ -10,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApplicationService } from './application.service';
 import {
   ApplyJobRequest,
@@ -35,6 +36,7 @@ import {
 
 @ApiTags('Job Applications')
 @ApiBearerAuth()
+@Throttle({ default: { limit: 30, ttl: 60000 } })
 @Controller('/api')
 export class ApplicationController {
   constructor(private applicationService: ApplicationService) {}

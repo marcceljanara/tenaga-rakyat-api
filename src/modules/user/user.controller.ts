@@ -12,6 +12,7 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { UserService } from './user.service';
 import {
   EditUserRequest,
@@ -35,6 +36,7 @@ import {
   ApiBearerAuth,
   ApiBody,
 } from '@nestjs/swagger';
+import { generateCsrfToken } from '../../common/csrf.js';
 
 @ApiTags('User Authentication & Profile')
 @Controller('/api/users')
@@ -44,6 +46,7 @@ export class UserController {
     private profilePictureService: ProfilePictureService,
   ) { }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post()
   @HttpCode(201)
   @ApiOperation({
@@ -91,6 +94,28 @@ export class UserController {
     };
   }
 
+  @Get('/csrf-token')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Get CSRF Token',
+    description: 'Retrieve a CSRF token to be included in subsequent state-changing requests.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'CSRF token returned successfully.',
+    schema: {
+      type: 'object',
+      properties: {
+        csrfToken: { type: 'string', example: '...' },
+      },
+    },
+  })
+  getCsrfToken(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const csrfToken = generateCsrfToken(req, res);
+    return { csrfToken };
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('/login')
   @HttpCode(200)
   @ApiOperation({
@@ -129,10 +154,14 @@ export class UserController {
       .cookie('access_token', accessToken, {
         httpOnly: true,
         maxAge: 15 * 60 * 1000,
+        secure: process.env.NODE_ENV === 'production' ? true : false,
+        sameSite: 'lax'
       })
       .cookie('refresh_token', refreshToken, {
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000,
+        secure: process.env.NODE_ENV === 'production' ? true : false,
+        sameSite: 'lax'
       })
       .json({ message: 'Login success' });
   }
@@ -175,10 +204,14 @@ export class UserController {
       .cookie('access_token', accessToken, {
         httpOnly: true,
         maxAge: 15 * 60 * 1000,
+        secure: true,
+        sameSite: 'lax',
       })
       .cookie('refresh_token', newRefreshToken, {
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000,
+        secure: true,
+        sameSite: 'lax',
       })
       .json({ message: 'Token refreshed' });
   }

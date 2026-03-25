@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { ReportService } from './report.service';
 import {
@@ -30,6 +31,7 @@ import {
 @ApiTags('Admin - Reports')
 @ApiBearerAuth()
 @ApiExtraModels(ReportDashboardSummaryResponse)
+@Throttle({ default: { limit: 20, ttl: 60000 } })
 @Controller('/api/admin/report')
 export class ReportController {
   constructor(private reportService: ReportService) { }

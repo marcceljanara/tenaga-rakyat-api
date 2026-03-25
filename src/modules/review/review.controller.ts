@@ -9,6 +9,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ReviewService } from './review.service';
 import {
   CreateReviewRequest,
@@ -33,6 +34,7 @@ import {
 
 @ApiTags('Reviews')
 @ApiBearerAuth()
+@Throttle({ default: { limit: 30, ttl: 60000 } })
 @Controller('/api/reviews')
 export class ReviewController {
   constructor(private reviewService: ReviewService) { }

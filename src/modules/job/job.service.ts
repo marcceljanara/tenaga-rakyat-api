@@ -130,7 +130,6 @@ export class JobService {
         address_detail: createRequest.address_detail,
         compensation_amount: createRequest.compensation_amount,
         status: JobStatus.OPEN,
-        completed_at: new Date(), // Temporary, will be updated when completed
         payment_method: createRequest.payment_method,
         job_latitude: createRequest.job_latitude,
         job_longitude: createRequest.job_longitude,

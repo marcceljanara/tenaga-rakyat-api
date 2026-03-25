@@ -52,14 +52,18 @@ export class UserPhotoService {
     }
     console.log(file.mimetype);
 
-    // Validate file type
+    // Validate file type using file-type (server-side verification)
+    const { fileTypeFromBuffer } = await (eval('import("file-type")') as Promise<typeof import('file-type')>);
+    const type = await fileTypeFromBuffer(file.buffer);
+
     const allowedMimeTypes = [
       'image/jpeg',
       'image/jpg',
       'image/png',
       'image/webp',
     ];
-    if (!allowedMimeTypes.includes(file.mimetype)) {
+
+    if (!type || !allowedMimeTypes.includes(type.mime)) {
       throw new HttpException(
         'Invalid file type. Only JPEG, PNG, and WebP are allowed',
         422,
