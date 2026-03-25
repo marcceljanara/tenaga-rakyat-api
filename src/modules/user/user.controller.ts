@@ -112,7 +112,7 @@ export class UserController {
   })
   getCsrfToken(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const csrfToken = generateCsrfToken(req, res);
-    return res.json({ csrfToken });
+    return { csrfToken };
   }
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
