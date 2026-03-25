@@ -12,6 +12,7 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { UserService } from './user.service';
 import {
   EditUserRequest,
@@ -45,6 +46,7 @@ export class UserController {
     private profilePictureService: ProfilePictureService,
   ) { }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post()
   @HttpCode(201)
   @ApiOperation({
@@ -113,6 +115,7 @@ export class UserController {
     return res.json({ csrfToken });
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('/login')
   @HttpCode(200)
   @ApiOperation({

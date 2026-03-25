@@ -1,4 +1,5 @@
 import { Body, Controller, Post, HttpCode } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { EmailVerificationService } from './email-verification.service';
 import {
   VerifyEmailRequest,
@@ -23,6 +24,7 @@ import {
 } from '@nestjs/swagger';
 
 @ApiTags('Authentication & Email Verification')
+@Throttle({ default: { limit: 5, ttl: 60000 } })
 @Controller('/api/auth')
 export class AuthController {
   constructor(private emailVerificationService: EmailVerificationService) {}

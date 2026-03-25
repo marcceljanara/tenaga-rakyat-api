@@ -11,6 +11,7 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UserPhotoService } from './user-photo.service';
 import {
@@ -34,6 +35,7 @@ import {
 
 @ApiTags('User Photos')
 @ApiBearerAuth()
+@Throttle({ default: { limit: 10, ttl: 60000 } })
 @Controller('/api/users/photos')
 export class UserPhotoController {
   constructor(private userPhotoService: UserPhotoService) {}

@@ -19,6 +19,7 @@ import { RoleGuard } from './role/role.guard';
 import { BullModule } from '@nestjs/bull';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 @Global()
 @Module({
@@ -31,6 +32,12 @@ import { join } from 'path';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100, // Global default limit
+      },
+    ]),
 
     // Bull Queue Configuration
     BullModule.forRoot({
@@ -69,6 +76,10 @@ import { join } from 'path';
     {
       provide: APP_GUARD,
       useClass: RoleGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
   exports: [PrismaService, ValidationService],
