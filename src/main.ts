@@ -31,8 +31,8 @@ async function bootstrap() {
   });
   
   app.use(cookieParser());
-  const { doubleCsrfProtection } = await import('./common/csrf.js');
-  app.use(doubleCsrfProtection);
+  // const { doubleCsrfProtection } = await import('./common/csrf.js');
+  // app.use(doubleCsrfProtection);
 
   // Swagger Configuration
   const config = new DocumentBuilder()

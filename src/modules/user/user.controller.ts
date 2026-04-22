@@ -154,14 +154,14 @@ export class UserController {
       .cookie('access_token', accessToken, {
         httpOnly: true,
         maxAge: 15 * 60 * 1000,
-        secure: process.env.NODE_ENV === 'production' ? true : false,
-        sameSite: 'lax'
+        // secure: process.env.NODE_ENV === 'production' ? true : false,
+        sameSite: 'none'
       })
       .cookie('refresh_token', refreshToken, {
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000,
         secure: process.env.NODE_ENV === 'production' ? true : false,
-        sameSite: 'lax'
+        sameSite: 'none'
       })
       .json({ message: 'Login success' });
   }
@@ -204,14 +204,14 @@ export class UserController {
       .cookie('access_token', accessToken, {
         httpOnly: true,
         maxAge: 15 * 60 * 1000,
-        secure: true,
-        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production' ? true : false,
+        sameSite: 'none',
       })
       .cookie('refresh_token', newRefreshToken, {
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000,
-        secure: true,
-        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production' ? true : false,
+        sameSite: 'none',
       })
       .json({ message: 'Token refreshed' });
   }
@@ -247,8 +247,18 @@ export class UserController {
     const refreshToken = req.cookies?.['refresh_token'] as string;
     await this.userService.logout(refreshToken);
     res
-      .clearCookie('access_token')
-      .clearCookie('refresh_token')
+      .clearCookie('access_token',
+        {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production' ? true : false,
+        sameSite: 'none', 
+      }
+      )
+      .clearCookie('refresh_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production' ? true : false,
+        sameSite: 'none',
+      } )
       .json({ message: 'Logged out' });
   }
 
