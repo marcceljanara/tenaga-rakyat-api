@@ -1,0 +1,16 @@
+.git
+.gitignore
+.dockerignore
+node_modules
+npm-debug.log
+dist
+coverage
+.env
+
+# Provide empty uploads folder only if required, keep local messy uploads out
+uploads/*
+!uploads/.gitkeep
+
+# Operating System files
+.DS_Store
+Thumbs.db
