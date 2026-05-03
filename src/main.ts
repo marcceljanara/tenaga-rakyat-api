@@ -6,7 +6,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   // Security Headers
   app.use(
     helmet({
@@ -14,25 +14,22 @@ async function bootstrap() {
       contentSecurityPolicy: {
         directives: {
           ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-          'img-src': [
-            "'self'",
-            "data:"
-          ],
+          'img-src': ["'self'", 'data:'],
         },
       },
     }),
   );
-  
+
   // CORS Configuration
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
-  
+
   app.use(cookieParser());
-  // const { doubleCsrfProtection } = await import('./common/csrf.js');
-  // app.use(doubleCsrfProtection);
+  const { doubleCsrfProtection } = await import('./common/csrf.js');
+  app.use(doubleCsrfProtection);
 
   // Swagger Configuration
   const config = new DocumentBuilder()
@@ -123,9 +120,18 @@ Success response mengikuti format:
     .addTag('Admin - User Management', 'Endpoints untuk admin mengelola user')
     .addTag('Admin - Reports', 'Endpoints untuk laporan dan statistik platform')
     .addTag('User Photos', 'Endpoints untuk manajemen foto portfolio pengguna')
-    .addTag('Reviews', 'Endpoints untuk review bidireksional antara pemberi kerja dan pekerja')
-    .addTag('Posting Credits', 'Endpoints untuk pembelian dan pengelolaan kredit posting')
-    .addTag('Admin - Posting Credits', 'Endpoints untuk admin mengelola paket kredit posting')
+    .addTag(
+      'Reviews',
+      'Endpoints untuk review bidireksional antara pemberi kerja dan pekerja',
+    )
+    .addTag(
+      'Posting Credits',
+      'Endpoints untuk pembelian dan pengelolaan kredit posting',
+    )
+    .addTag(
+      'Admin - Posting Credits',
+      'Endpoints untuk admin mengelola paket kredit posting',
+    )
     .addServer('http://localhost:3000', 'Development Server')
     .addServer('https://api.example.com', 'Production Server')
     .build();

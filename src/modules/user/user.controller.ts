@@ -44,7 +44,7 @@ export class UserController {
   constructor(
     private userService: UserService,
     private profilePictureService: ProfilePictureService,
-  ) { }
+  ) {}
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post()
@@ -98,7 +98,8 @@ export class UserController {
   @HttpCode(200)
   @ApiOperation({
     summary: 'Get CSRF Token',
-    description: 'Retrieve a CSRF token to be included in subsequent state-changing requests.',
+    description:
+      'Retrieve a CSRF token to be included in subsequent state-changing requests.',
   })
   @ApiResponse({
     status: 200,
@@ -154,14 +155,14 @@ export class UserController {
       .cookie('access_token', accessToken, {
         httpOnly: true,
         maxAge: 15 * 60 * 1000,
-        // secure: process.env.NODE_ENV === 'production' ? true : false,
-        sameSite: 'none'
+        secure: process.env.NODE_ENV === 'production' ? true : false,
+        sameSite: 'lax',
       })
       .cookie('refresh_token', refreshToken, {
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000,
         secure: process.env.NODE_ENV === 'production' ? true : false,
-        sameSite: 'none'
+        sameSite: 'lax',
       })
       .json({ message: 'Login success' });
   }
@@ -205,13 +206,13 @@ export class UserController {
         httpOnly: true,
         maxAge: 15 * 60 * 1000,
         secure: process.env.NODE_ENV === 'production' ? true : false,
-        sameSite: 'none',
+        sameSite: 'lax',
       })
       .cookie('refresh_token', newRefreshToken, {
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000,
         secure: process.env.NODE_ENV === 'production' ? true : false,
-        sameSite: 'none',
+        sameSite: 'lax',
       })
       .json({ message: 'Token refreshed' });
   }
@@ -247,18 +248,16 @@ export class UserController {
     const refreshToken = req.cookies?.['refresh_token'] as string;
     await this.userService.logout(refreshToken);
     res
-      .clearCookie('access_token',
-        {
+      .clearCookie('access_token', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production' ? true : false,
-        sameSite: 'none', 
-      }
-      )
+        sameSite: 'lax',
+      })
       .clearCookie('refresh_token', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production' ? true : false,
-        sameSite: 'none',
-      } )
+        sameSite: 'lax',
+      })
       .json({ message: 'Logged out' });
   }
 
