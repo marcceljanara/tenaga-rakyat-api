@@ -49,6 +49,12 @@ services:
       # Update these variables based on your actual application .env expectations for Redis config
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
+      SERVICE_NAME: "tenaga-rakyat-api"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PRISMA_SLOW_QUERY_MS: ${PRISMA_SLOW_QUERY_MS:-500}
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
+      OTEL_TRACES_EXPORTER: "otlp"
+      OTEL_METRICS_EXPORTER: "otlp"
       # Include any other essential production environment variables below
       # JWT_SECRET: "your_secret_here"
     volumes:
@@ -59,9 +65,92 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: tenaga-rakyat-prometheus
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - api
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: tenaga-rakyat-grafana
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: tenaga-rakyat-loki
+    restart: always
+    command: -config.file=/etc/loki/local-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki/loki.yml:/etc/loki/local-config.yml:ro
+      - loki-data:/loki
+
+  promtail:
+    image: grafana/promtail:3.3.2
+    container_name: tenaga-rakyat-promtail
+    restart: always
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./observability/promtail/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: tenaga-rakyat-tempo
+    restart: always
+    command: ["-config.file=/etc/tempo.yml"]
+    ports:
+      - "3200:3200"
+    volumes:
+      - ./observability/tempo/tempo.yml:/etc/tempo.yml:ro
+      - tempo-data:/tmp/tempo
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.113.0
+    container_name: tenaga-rakyat-otel-collector
+    restart: always
+    command: ["--config=/etc/otel-collector.yml"]
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "9464:9464"
+    volumes:
+      - ./observability/otel-collector/otel-collector.yml:/etc/otel-collector.yml:ro
+    depends_on:
+      - tempo
 
 volumes:
   # Using named volumes is the best practice for persistency in Docker and VPS deployments
   postgres-data:
   redis-data:
   uploads-data:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  tempo-data:

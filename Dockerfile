@@ -30,6 +30,7 @@ WORKDIR /app
 
 # Set NODE_ENV to production
 ENV NODE_ENV=production
+ENV PRISMA_SEED_COMMAND="node dist/prisma/seed.js"
 
 # Copy package files
 COPY package.json package-lock.json ./
