@@ -1,14 +1,16 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
-import { Test, TestingModule } from '@nestjs/testing';
+import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { INestApplication } from '@nestjs/common';
-import request from 'supertest';
+import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
+import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
+import request from 'supertest';
+import { Logger } from 'winston';
 import { AppModule } from '../src/app.module';
+import { EmailSenderService } from '../src/modules/auth/email-sender.service';
 import { TestModule } from './test.module';
 import { TestService } from './test.service';
-import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
-import { Logger } from 'winston';
-import { EmailSenderService } from '../src/modules/auth/email-sender.service';
 
 describe('AdminController', () => {
   let app: INestApplication;
@@ -21,10 +23,10 @@ describe('AdminController', () => {
     })
       .overrideProvider(EmailSenderService)
       .useValue({
-        sendEmail: jest.fn().mockResolvedValue(undefined),
-        sendEmailSync: jest.fn().mockResolvedValue(undefined),
-        processEmail: jest.fn().mockResolvedValue(undefined),
-        sendBulkEmails: jest.fn().mockResolvedValue(undefined),
+        sendEmail: jest.fn(() => undefined),
+        sendEmailSync: jest.fn(() => undefined),
+        processEmail: jest.fn(() => undefined),
+        sendBulkEmails: jest.fn(() => undefined),
       })
       .compile();
 

@@ -41,7 +41,10 @@ describe('UserManagementController', () => {
     await app.close();
   });
 
-  async function loginAs(email: string, password = '1234test'): Promise<string[]> {
+  async function loginAs(
+    email: string,
+    password = '1234test',
+  ): Promise<string[]> {
     const login = await request(app.getHttpServer())
       .post('/api/users/login')
       .send({ email, password });

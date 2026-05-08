@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
@@ -47,7 +49,10 @@ describe('AuthController', () => {
     await app.close();
   });
 
-  async function loginAs(email: string, password = '1234test'): Promise<string[]> {
+  async function loginAs(
+    email: string,
+    password = '1234test',
+  ): Promise<string[]> {
     const login = await request(app.getHttpServer())
       .post('/api/users/login')
       .send({ email, password });
@@ -57,7 +62,10 @@ describe('AuthController', () => {
   // Helper to extract token from mock
   function extractTokenFromLastEmail(): string | null {
     if (mockEmailSender.sendEmail.mock.calls.length === 0) return null;
-    const lastCall = mockEmailSender.sendEmail.mock.calls[mockEmailSender.sendEmail.mock.calls.length - 1][0];
+    const lastCall =
+      mockEmailSender.sendEmail.mock.calls[
+        mockEmailSender.sendEmail.mock.calls.length - 1
+      ][0];
     const html = lastCall.html;
     const match = html.match(/token=([a-zA-Z0-9_-]+)/);
     return match ? match[1] : null;
@@ -90,12 +98,18 @@ describe('AuthController', () => {
         .send({ purpose: 'REGISTER' });
 
       expect(response.statusCode).toBe(200);
-      expect(response.body.data.message).toBe('Email verifikasi berhasil dikirim');
+      expect(response.body.data.message).toBe(
+        'Email verifikasi berhasil dikirim',
+      );
       expect(mockEmailSender.sendEmail).toHaveBeenCalledTimes(1);
 
       // Verify the new active token exists
       const tokenRecord = await prismaService.emailVerification.findFirst({
-        where: { user_id: unverifiedUserId, purpose: 'REGISTER', is_revoked: false },
+        where: {
+          user_id: unverifiedUserId,
+          purpose: 'REGISTER',
+          is_revoked: false,
+        },
       });
       expect(tokenRecord).not.toBeNull();
     });
@@ -141,7 +155,9 @@ describe('AuthController', () => {
         .send({ purpose: 'CHANGE_EMAIL' });
 
       expect(response.statusCode).toBe(400);
-      expect(response.body.errors).toContain('Tidak ada permintaan perubahan email yang pending');
+      expect(response.body.errors).toContain(
+        'Tidak ada permintaan perubahan email yang pending',
+      );
     });
   });
 
@@ -179,7 +195,9 @@ describe('AuthController', () => {
       expect(response.statusCode).toBe(200);
       expect(response.body.data.success).toBe(true);
 
-      const user = await prismaService.user.findUnique({ where: { id: unverifiedUserId } });
+      const user = await prismaService.user.findUnique({
+        where: { id: unverifiedUserId },
+      });
       expect(user?.verification_status).toBe('EMAIL_VERIFIED');
     });
 
@@ -204,7 +222,9 @@ describe('AuthController', () => {
 
       expect(response.statusCode).toBe(200);
 
-      const user = await prismaService.user.findUnique({ where: { id: unverifiedUserId } });
+      const user = await prismaService.user.findUnique({
+        where: { id: unverifiedUserId },
+      });
       expect(user?.email).toBe('mynewmail@mail.com');
       expect(user?.verification_status).toBe('EMAIL_VERIFIED');
     });
@@ -215,7 +235,9 @@ describe('AuthController', () => {
         .send({ token: '1234invalid' });
 
       expect(response.statusCode).toBe(400);
-      expect(response.body.errors).toContain('Token verifikasi tidak valid atau sudah kedaluwarsa');
+      expect(response.body.errors).toContain(
+        'Token verifikasi tidak valid atau sudah kedaluwarsa',
+      );
     });
 
     it('should reject expired tokens', async () => {
@@ -238,7 +260,9 @@ describe('AuthController', () => {
         .send({ token });
 
       expect(response.statusCode).toBe(400);
-      expect(response.body.errors).toContain('Token verifikasi sudah kedaluwarsa');
+      expect(response.body.errors).toContain(
+        'Token verifikasi sudah kedaluwarsa',
+      );
     });
   });
 
@@ -306,7 +330,9 @@ describe('AuthController', () => {
         });
 
       expect(resetResponse.statusCode).toBe(400);
-      expect(resetResponse.body.errors).toContain('Password baru dan konfirmasi tidak cocok');
+      expect(resetResponse.body.errors).toContain(
+        'Password baru dan konfirmasi tidak cocok',
+      );
     });
   });
 

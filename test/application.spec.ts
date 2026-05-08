@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
-import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import request from 'supertest';
+import { Test, TestingModule } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
+import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
+import request from 'supertest';
+import { Logger } from 'winston';
 import { AppModule } from '../src/app.module';
+import { EmailSenderService } from '../src/modules/auth/email-sender.service';
 import { TestModule } from './test.module';
 import { TestService } from './test.service';
-import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
-import { Logger } from 'winston';
-import { EmailSenderService } from '../src/modules/auth/email-sender.service';
 
 describe('ApplicationController', () => {
   let app: INestApplication;

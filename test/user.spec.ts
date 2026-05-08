@@ -364,8 +364,9 @@ describe('UserController', () => {
     });
 
     it('should reject if not authenticated', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/api/users/profile');
+      const response = await request(app.getHttpServer()).get(
+        '/api/users/profile',
+      );
 
       expect(response.statusCode).toBe(401);
     });
@@ -396,14 +397,16 @@ describe('UserController', () => {
     });
 
     it('should reject if not authenticated', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/api/users/profile/some-uuid');
+      const response = await request(app.getHttpServer()).get(
+        '/api/users/profile/some-uuid',
+      );
 
       expect(response.statusCode).toBe(401);
     });
 
     it('should be able to get another user profile by ID', async () => {
       const userId = await testService.addUser();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const providerId = await testService.addProvider();
 
       // Login as provider, view worker profile
@@ -521,7 +524,7 @@ describe('UserController', () => {
         .put('/api/users/profile/location')
         .set('Cookie', userCookie)
         .send({
-          latitude: -6.200000,
+          latitude: -6.2,
           longitude: 106.816666,
         });
 

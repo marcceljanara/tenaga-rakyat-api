@@ -43,7 +43,10 @@ describe('ReportController', () => {
     await app.close();
   });
 
-  async function loginAs(email: string, password = '1234test'): Promise<string[]> {
+  async function loginAs(
+    email: string,
+    password = '1234test',
+  ): Promise<string[]> {
     const login = await request(app.getHttpServer())
       .post('/api/users/login')
       .send({ email, password });
@@ -85,8 +88,9 @@ describe('ReportController', () => {
     });
 
     it('should reject unauthenticated users', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/api/admin/report/dashboard-summary');
+      const response = await request(app.getHttpServer()).get(
+        '/api/admin/report/dashboard-summary',
+      );
 
       expect(response.statusCode).toBe(401);
     });
@@ -99,7 +103,9 @@ describe('ReportController', () => {
         .set('Cookie', superAdminCookie);
       expect(response.statusCode).toBe(200);
       expect(response.headers['content-type']).toContain('text/csv');
-      expect(response.headers['content-disposition']).toContain('attachment; filename=');
+      expect(response.headers['content-disposition']).toContain(
+        'attachment; filename=',
+      );
     });
 
     it('should reject missing date range', async () => {
