@@ -1,0 +1,120 @@
+name: Continuous Deployment
+
+on:
+  workflow_run:
+    workflows:
+      - Continous Integration
+    types:
+      - completed
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Production VPS
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    environment: production
+
+    env:
+      DOMAIN: api.tenagarakyat.site
+      DEPLOY_BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      REPOSITORY: ${{ github.repository }}
+      APP_DIR: ${{ secrets.DEPLOY_PATH }}
+      LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
+
+    steps:
+      - name: Deploy application on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DOMAIN: ${{ env.DOMAIN }}
+          DEPLOY_BRANCH: ${{ env.DEPLOY_BRANCH }}
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+          REPOSITORY: ${{ env.REPOSITORY }}
+          APP_DIR: ${{ env.APP_DIR }}
+          LETSENCRYPT_EMAIL: ${{ env.LETSENCRYPT_EMAIL }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          envs: DOMAIN,DEPLOY_BRANCH,DEPLOY_SHA,REPOSITORY,APP_DIR,LETSENCRYPT_EMAIL
+          script_stop: true
+          script: |
+            set -eu
+
+            if [ -z "${APP_DIR:-}" ]; then
+              APP_DIR="$HOME/tenaga-rakyat-api"
+            fi
+
+            compose() {
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml "$@"
+            }
+
+            echo "1. Checking required tools"
+            command -v git >/dev/null 2>&1
+            command -v docker >/dev/null 2>&1
+            docker compose version
+
+            echo "2. Preparing application directory: $APP_DIR"
+            if [ ! -d "$APP_DIR/.git" ]; then
+              mkdir -p "$APP_DIR"
+              git clone --branch "$DEPLOY_BRANCH" "https://github.com/$REPOSITORY.git" "$APP_DIR"
+            fi
+
+            cd "$APP_DIR"
+
+            echo "3. Pulling repository commit: $DEPLOY_SHA"
+            git fetch --prune origin "$DEPLOY_BRANCH"
+            git checkout -B "$DEPLOY_BRANCH" "$DEPLOY_SHA"
+            git reset --hard "$DEPLOY_SHA"
+
+            echo "4. Validating production files"
+            test -f Dockerfile
+            test -f docker-compose.yml
+            test -f docker-compose.prod.yml
+            test -f nginx/conf.d/api.tenagarakyat.site.conf
+            test -f .env
+            compose config --quiet
+
+            echo "5. Checking SSL certificate"
+            if compose run --rm --entrypoint sh certbot -c "test -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem"; then
+              echo "SSL certificate already exists"
+            else
+              if [ -z "${LETSENCRYPT_EMAIL:-}" ]; then
+                email_line="$(sed -n 's/^LETSENCRYPT_EMAIL=//p' .env | tail -n 1)"
+                LETSENCRYPT_EMAIL="$(printf '%s' "$email_line" | tr -d "'\"")"
+              fi
+
+              if [ -z "${LETSENCRYPT_EMAIL:-}" ]; then
+                echo "LETSENCRYPT_EMAIL is required. Add it to GitHub secrets or the VPS .env file."
+                exit 1
+              fi
+
+              compose stop nginx || true
+              compose run --rm --publish 80:80 --entrypoint certbot certbot certonly \
+                --standalone \
+                -d "$DOMAIN" \
+                --email "$LETSENCRYPT_EMAIL" \
+                --agree-tos \
+                --no-eff-email \
+                --non-interactive
+            fi
+
+            echo "6. Pulling base images"
+            compose pull nginx certbot postgres redis || true
+
+            echo "7. Building and starting production stack"
+            compose up -d --build --remove-orphans
+
+            echo "8. Current production containers"
+            compose ps
+
+            echo "9. Cleaning unused Docker images"
+            docker image prune -f
