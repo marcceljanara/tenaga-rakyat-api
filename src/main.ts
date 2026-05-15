@@ -6,6 +6,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
   // Security Headers
   app.use(
@@ -133,7 +134,7 @@ Success response mengikuti format:
       'Endpoints untuk admin mengelola paket kredit posting',
     )
     .addServer('http://localhost:3000', 'Development Server')
-    .addServer('https://api.example.com', 'Production Server')
+    .addServer('https://api.tenagarakyat.site', 'Production Server')
     .build();
 
   const document = SwaggerModule.createDocument(app, config, {
