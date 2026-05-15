@@ -46,6 +46,8 @@ jobs:
           npx prisma generate
           npx prisma migrate dev
           npx prisma db seed
+        env:
+          DATABASE_URL: postgres://postgres:password@localhost:5432/tenaga_rakyat
       - name: Run tests
         run: npm run test
         env:
