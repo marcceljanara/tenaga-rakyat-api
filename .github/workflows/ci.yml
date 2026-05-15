@@ -1,0 +1,64 @@
+name: Continous Integration
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: ["22.x", "24.x"]
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: tenaga_rakyat
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version}}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version}}
+      - name: Wait for Postgres to be ready
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for Postgres to be ready..."
+            sleep 5
+          done
+      - name: Install dependencies
+        run: npm install
+      - name: Database Migration & Seeding
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          npx prisma db seed
+      - name: Run tests
+        run: npm run test
+        env:
+          DATABASE_URL: postgres://postgres:password@localhost:5432/tenaga_rakyat
+          JWT_SECRET : YmytJHejk1bPG2jaVyJ6jcpQ3Nel1h3xULg810alzJJ
+          MIDTRANS_SERVER_KEY : Mid-server-xxxxx
+          MIDTRANS_CLIENT_KEY : Mid-client-xxxxx
+          ENCRYPTION_KEY : 6wEM94CQ05LKRNZlipBphjQzeC0FAMlN8Vdl5VYWyTA=
+          SUPER_ADMIN_EMAIL : admin@admin.com
+          SUPER_ADMIN_PASSWORD : password
+          FRONTEND_URL: http://localhost:5173
+          EMAIL_USER : xxxxxxxxxxxsa@gmail.com
+          EMAIL_APP_PASSWORD : xxxxxxxxxxxx
+          EMAIL_FROM_NAME : Tenaga Rakyat Support
+          NODE_ENV: development 
+
