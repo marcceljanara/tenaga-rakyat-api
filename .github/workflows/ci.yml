@@ -48,6 +48,8 @@ jobs:
           npx prisma db seed
         env:
           DATABASE_URL: postgres://postgres:password@localhost:5432/tenaga_rakyat
+          SUPER_ADMIN_EMAIL : admin@admin.com
+          SUPER_ADMIN_PASSWORD : password
       - name: Run tests
         run: npm run test
         env:

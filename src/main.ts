@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { doubleCsrfProtection } from './common/csrf';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -29,7 +30,6 @@ async function bootstrap() {
   });
 
   app.use(cookieParser());
-  const { doubleCsrfProtection } = await import('./common/csrf.js');
   app.use(doubleCsrfProtection);
 
   // Swagger Configuration
