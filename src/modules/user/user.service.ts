@@ -1,9 +1,13 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { Prisma, VerificationPurpose } from '@prisma/client';
+import bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
+import { addDays } from 'date-fns';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
-import { ValidationService } from '../../common/validation.service';
 import { PrismaService } from '../../common/prisma.service';
-import bcrypt from 'bcrypt';
+import { ValidationService } from '../../common/validation.service';
 import {
   EditUserRequest,
   LoginUserRequest,
@@ -12,13 +16,10 @@ import {
   UpdateLocationRequest,
   UserResponse,
 } from '../../model/user.model';
-import { UserValidation } from './user.validation';
-import { JwtService } from '@nestjs/jwt';
-import { addDays } from 'date-fns';
-import { randomUUID } from 'crypto';
-import { Prisma, VerificationPurpose } from '@prisma/client';
+import { runWithSpan } from '../../observability/tracing.util';
 import { EmailVerificationService } from '../auth/email-verification.service';
 import { LocationService } from '../location/location.service';
+import { UserValidation } from './user.validation';
 
 @Injectable()
 export class UserService {
@@ -32,112 +33,129 @@ export class UserService {
   ) {}
 
   async register(request: RegisterUserRequest): Promise<UserResponse> {
-    this.logger.debug(`Register new user ${JSON.stringify(request)}`);
-    const id: string = randomUUID();
-    const registerRequest: RegisterUserRequest =
-      this.validationService.validate(UserValidation.REGISTER, request);
+    return runWithSpan(
+      'user.register',
+      { 'app.auth.operation': 'register' },
+      async () => {
+        this.logger.debug(`Register new user ${JSON.stringify(request)}`);
+        const id: string = randomUUID();
+        const registerRequest: RegisterUserRequest =
+          this.validationService.validate(UserValidation.REGISTER, request);
 
-    const existing = await this.prismaService.user.findFirst({
-      where: {
-        OR: [
-          { email: registerRequest.email },
-          { phone_number: registerRequest.phone_number },
-        ],
+        const existing = await this.prismaService.user.findFirst({
+          where: {
+            OR: [
+              { email: registerRequest.email },
+              { phone_number: registerRequest.phone_number },
+            ],
+          },
+        });
+
+        if (existing) {
+          if (existing.email === registerRequest.email) {
+            throw new HttpException('Email already exists', 400);
+          }
+
+          if (existing.phone_number === registerRequest.phone_number) {
+            throw new HttpException('Phone number already exists', 400);
+          }
+        }
+
+        registerRequest.password = await bcrypt.hash(
+          registerRequest.password,
+          10,
+        );
+        const result = await this.prismaService.$transaction(async (tx) => {
+          const user = await tx.user.create({
+            data: {
+              ...registerRequest,
+              id,
+            },
+          });
+          await tx.wallet.create({
+            data: {
+              user_id: user.id,
+            },
+          });
+          await tx.userPostingQuota.create({
+            data: {
+              user_id: user.id,
+            },
+          });
+          return {
+            id: user.id,
+            full_name: user.full_name,
+            email: user.email,
+          };
+        });
+        try {
+          await this.emailVerificationService.sendVerificationEmail(
+            result.id,
+            result.email,
+            VerificationPurpose.REGISTER,
+          );
+          this.logger.info(`Verification email sent to ${result.email}`);
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error(
+            `Failed to send verification email: ${errorMessage}`,
+          );
+        }
+        return result;
       },
-    });
-
-    if (existing) {
-      if (existing.email === registerRequest.email) {
-        throw new HttpException('Email already exists', 400);
-      }
-
-      if (existing.phone_number === registerRequest.phone_number) {
-        throw new HttpException('Phone number already exists', 400);
-      }
-    }
-
-    registerRequest.password = await bcrypt.hash(registerRequest.password, 10);
-    const result = await this.prismaService.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          ...registerRequest,
-          id,
-        },
-      });
-      await tx.wallet.create({
-        data: {
-          user_id: user.id,
-        },
-      });
-      await tx.userPostingQuota.create({
-        data: {
-          user_id: user.id,
-        },
-      });
-      return {
-        id: user.id,
-        full_name: user.full_name,
-        email: user.email,
-      };
-    });
-    // Send verification email asynchronously
-    try {
-      await this.emailVerificationService.sendVerificationEmail(
-        result.id,
-        result.email,
-        VerificationPurpose.REGISTER,
-      );
-      this.logger.info(`Verification email sent to ${result.email}`);
-    } catch (error) {
-      this.logger.error(`Failed to send verification email: ${error.message}`);
-      // Don't fail registration if email fails, user can resend later
-    }
-    return result;
+    );
   }
 
   async login(request: LoginUserRequest): Promise<LoginUserResponse> {
-    this.logger.debug(`Login user ${JSON.stringify(request)}`);
-    const loginRequest: LoginUserRequest = this.validationService.validate(
-      UserValidation.LOGIN,
-      request,
-    );
-    const user = await this.prismaService.user.findUnique({
-      where: {
-        email: loginRequest.email,
+    return runWithSpan(
+      'user.login',
+      { 'app.auth.operation': 'login' },
+      async () => {
+        this.logger.debug(`Login user ${JSON.stringify(request)}`);
+        const loginRequest: LoginUserRequest = this.validationService.validate(
+          UserValidation.LOGIN,
+          request,
+        );
+        const user = await this.prismaService.user.findUnique({
+          where: {
+            email: loginRequest.email,
+          },
+        });
+        if (!user) {
+          throw new HttpException('Email is invalid', 401);
+        }
+
+        const isPasswordValid = await bcrypt.compare(
+          loginRequest.password,
+          user.password,
+        );
+
+        if (!isPasswordValid) {
+          throw new HttpException('Password is invalid', 401);
+        }
+
+        const accessToken = await this.jwt.signAsync({
+          id: user.id,
+          role_id: String(user.role_id),
+        });
+
+        const refreshToken = randomUUID();
+        await this.prismaService.refreshToken.create({
+          data: {
+            token: refreshToken,
+            user_id: user.id,
+            expires_at: addDays(new Date(), 7),
+          },
+        });
+
+        return { access_token: accessToken, refresh_token: refreshToken };
       },
-    });
-    if (!user) {
-      throw new HttpException('Email is invalid', 401);
-    }
-
-    const isPasswordValid = await bcrypt.compare(
-      loginRequest.password,
-      user.password,
     );
-
-    if (!isPasswordValid) {
-      throw new HttpException('Password is invalid', 401);
-    }
-
-    const accessToken = await this.jwt.signAsync({
-      id: user.id,
-      role_id: String(user.role_id),
-    });
-
-    const refreshToken = randomUUID();
-    await this.prismaService.refreshToken.create({
-      data: {
-        token: refreshToken,
-        user_id: user.id,
-        expires_at: addDays(new Date(), 7),
-      },
-    });
-
-    return { access_token: accessToken, refresh_token: refreshToken };
   }
 
   async refresh(refreshToken: string): Promise<LoginUserResponse> {
-    this.logger.debug(`Refresh token user ${JSON.stringify(refreshToken)}`);
+    this.logger.debug('Refresh token requested');
     if (!refreshToken) {
       throw new HttpException('Missing refresh token', 401);
     }
@@ -181,7 +199,7 @@ export class UserService {
   }
 
   async logout(refreshToken: string): Promise<void> {
-    this.logger.debug(`Refresh token user ${JSON.stringify(refreshToken)}`);
+    this.logger.debug('Logout requested');
     if (!refreshToken) {
       throw new HttpException('Missing refresh token', 401);
     }

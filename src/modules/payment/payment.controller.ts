@@ -58,6 +58,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { PaginationQueryDto } from '../../common/pagination.dto';
+import { runWithSpan } from '../../observability/tracing.util';
 
 @ApiTags('Payment & Wallet')
 @Throttle({ default: { limit: 10, ttl: 60000 } })
@@ -135,9 +136,10 @@ export class PaymentController {
     @Auth() user: User,
     @Body() request: TopupWalletRequest,
   ): Promise<WebResponse<any>> {
-    const result = await this.paymentService.createTopupTransaction(
-      request,
-      user,
+    const result = await runWithSpan(
+      'payment.wallet_topup',
+      { 'app.payment.operation': 'wallet_topup' },
+      () => this.paymentService.createTopupTransaction(request, user),
     );
 
     return {
@@ -383,9 +385,10 @@ export class PaymentController {
     @Auth() user: User,
     @Body() request: CreateWithdrawRequestRequest,
   ): Promise<WebResponse<WithdrawRequestResponse>> {
-    const result = await this.paymentService.createWithdrawRequest(
-      user.id,
-      request,
+    const result = await runWithSpan(
+      'payment.withdraw_request.create',
+      { 'app.payment.operation': 'withdraw_request_create' },
+      () => this.paymentService.createWithdrawRequest(user.id, request),
     );
     return {
       message: 'Withdraw request created successfully',
@@ -586,7 +589,11 @@ export class PaymentController {
     @Param('id', ParseIntPipe) id: number,
     @Body() request: LockWithdrawRequest,
   ): Promise<WebResponse<string>> {
-    await this.paymentService.lockWithdrawRequest(id, admin.id, request);
+    await runWithSpan(
+      'payment.withdraw_request.lock',
+      { 'app.payment.operation': 'withdraw_request_lock' },
+      () => this.paymentService.lockWithdrawRequest(id, admin.id, request),
+    );
     return {
       message: 'Withdraw request locked',
     };
@@ -626,7 +633,11 @@ export class PaymentController {
     @Auth() admin: User,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<WebResponse<string>> {
-    await this.paymentService.unlockWithdrawRequest(id, admin.id);
+    await runWithSpan(
+      'payment.withdraw_request.unlock',
+      { 'app.payment.operation': 'withdraw_request_unlock' },
+      () => this.paymentService.unlockWithdrawRequest(id, admin.id),
+    );
     return {
       message: 'Withdraw request unlocked',
     };
@@ -669,10 +680,10 @@ export class PaymentController {
     @Param('id', ParseIntPipe) id: number,
     @Body() request: ApproveWithdrawRequest,
   ): Promise<WebResponse<WithdrawMethodReadyToPay>> {
-    const result = await this.paymentService.approveWithdrawRequest(
-      id,
-      admin.id,
-      request,
+    const result = await runWithSpan(
+      'payment.withdraw_request.approve',
+      { 'app.payment.operation': 'withdraw_request_approve' },
+      () => this.paymentService.approveWithdrawRequest(id, admin.id, request),
     );
     return {
       message: 'Withdraw approved',
@@ -716,7 +727,11 @@ export class PaymentController {
     @Param('id', ParseIntPipe) id: number,
     @Body() request: RejectWithdrawRequest,
   ): Promise<WebResponse<string>> {
-    await this.paymentService.rejectWithdrawRequest(id, admin.id, request);
+    await runWithSpan(
+      'payment.withdraw_request.reject',
+      { 'app.payment.operation': 'withdraw_request_reject' },
+      () => this.paymentService.rejectWithdrawRequest(id, admin.id, request),
+    );
     return {
       message: 'Withdraw rejected',
     };
@@ -754,7 +769,11 @@ export class PaymentController {
     @Param('id', ParseIntPipe) id: number,
     @Body() request: SendWithdrawRequest,
   ): Promise<WebResponse<string>> {
-    await this.paymentService.sendWithdrawRequest(id, request);
+    await runWithSpan(
+      'payment.withdraw_request.send',
+      { 'app.payment.operation': 'withdraw_request_send' },
+      () => this.paymentService.sendWithdrawRequest(id, request),
+    );
     return {
       message: 'Withdraw sent successfully',
     };
@@ -1051,9 +1070,10 @@ export class PaymentController {
     @Auth() user: User,
     @Body() request: TopupCreditRequest,
   ): Promise<WebResponse<any>> {
-    const result = await this.paymentService.createTopupCreditTransaction(
-      request,
-      user,
+    const result = await runWithSpan(
+      'payment.credit_topup',
+      { 'app.payment.operation': 'credit_topup' },
+      () => this.paymentService.createTopupCreditTransaction(request, user),
     );
 
     return {
@@ -1081,8 +1101,11 @@ export class PaymentController {
     },
   })
   async midtransCreditCallback(@Body() body: TopupCallbackRequest) {
-    console.log('Midtrans callback received:', body);
-    await this.paymentService.handleCallbackCredit(body);
+    await runWithSpan(
+      'payment.midtrans_credit_callback',
+      { 'app.payment.operation': 'midtrans_credit_callback' },
+      () => this.paymentService.handleCallbackCredit(body),
+    );
     return { message: 'OK' };
   }
 

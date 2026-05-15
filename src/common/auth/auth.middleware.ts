@@ -1,5 +1,6 @@
 import { HttpException, Injectable, NestMiddleware } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { RequestContextService } from '../../observability/request-context.service';
 
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
@@ -14,6 +15,7 @@ export class AuthMiddleware implements NestMiddleware {
       secret: process.env.JWT_SECRET,
     });
     req.user = payload;
+    RequestContextService.set({ userId: payload.id });
     next();
   }
 }

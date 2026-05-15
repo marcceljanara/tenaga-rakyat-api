@@ -21,6 +21,7 @@ import {
 } from '@prisma/client';
 import { ROLES } from '../../common/role/role';
 import { LocationService } from '../location/location.service';
+import { runWithSpan } from '../../observability/tracing.util';
 
 @Injectable()
 export class ApplicationService {
@@ -36,109 +37,115 @@ export class ApplicationService {
     workerId: string,
     request: ApplyJobRequest,
   ): Promise<ApplicationResponse> {
-    this.logger.debug(`Worker ${workerId} applying to job ${jobId}`);
+    return runWithSpan(
+      'application.apply_job',
+      { 'app.application.operation': 'apply_job' },
+      async () => {
+        this.logger.debug(`Worker ${workerId} applying to job ${jobId}`);
 
-    const applyRequest: ApplyJobRequest = this.validationService.validate(
-      ApplicationValidation.APPLY_JOB,
-      request,
-    );
+        const applyRequest: ApplyJobRequest = this.validationService.validate(
+          ApplicationValidation.APPLY_JOB,
+          request,
+        );
 
-    // Cek apakah job ada dan statusnya OPEN
-    const job = await this.prismaService.job.findUnique({
-      where: { id: jobId },
-      include: { provider: true },
-    });
+        // Cek apakah job ada dan statusnya OPEN
+        const job = await this.prismaService.job.findUnique({
+          where: { id: jobId },
+          include: { provider: true },
+        });
 
-    if (!job) {
-      throw new HttpException('Job tidak ditemukan', 404);
-    }
+        if (!job) {
+          throw new HttpException('Job tidak ditemukan', 404);
+        }
 
-    if (job.status !== JobStatus.OPEN) {
-      throw new HttpException('Lowongan ini sudah tidak tersedia', 400);
-    }
+        if (job.status !== JobStatus.OPEN) {
+          throw new HttpException('Lowongan ini sudah tidak tersedia', 400);
+        }
 
-    // Cek apakah user adalah pemberi kerja (tidak bisa melamar ke job sendiri)
-    if (job.provider_id === workerId) {
-      throw new HttpException(
-        'Anda tidak dapat melamar ke lowongan sendiri',
-        400,
-      );
-    }
+        // Cek apakah user adalah pemberi kerja (tidak bisa melamar ke job sendiri)
+        if (job.provider_id === workerId) {
+          throw new HttpException(
+            'Anda tidak dapat melamar ke lowongan sendiri',
+            400,
+          );
+        }
 
-    // Cek apakah sudah pernah melamar
-    const existingApplication =
-      await this.prismaService.jobApplication.findFirst({
-        where: {
-          job_id: jobId,
-          worker_id: workerId,
-        },
-      });
+        // Cek apakah sudah pernah melamar
+        const existingApplication =
+          await this.prismaService.jobApplication.findFirst({
+            where: {
+              job_id: jobId,
+              worker_id: workerId,
+            },
+          });
 
-    if (existingApplication) {
-      throw new HttpException('Anda sudah melamar ke lowongan ini', 400);
-    }
+        if (existingApplication) {
+          throw new HttpException('Anda sudah melamar ke lowongan ini', 400);
+        }
 
-    // Cek apakah user adalah worker (role_id = 1)
-    const worker = await this.prismaService.user.findUnique({
-      where: { id: workerId },
-    });
+        // Cek apakah user adalah worker (role_id = 1)
+        const worker = await this.prismaService.user.findUnique({
+          where: { id: workerId },
+        });
 
-    if (!worker) {
-      throw new HttpException('Pekerja tidak ditemukan', 404);
-    }
+        if (!worker) {
+          throw new HttpException('Pekerja tidak ditemukan', 404);
+        }
 
-    if (worker.role_id !== ROLES.PEKERJA) {
-      throw new HttpException(
-        'Hanya pekerja yang dapat melamar pekerjaan',
-        403,
-      );
-    }
+        if (worker.role_id !== ROLES.PEKERJA) {
+          throw new HttpException(
+            'Hanya pekerja yang dapat melamar pekerjaan',
+            403,
+          );
+        }
 
-    const wallet = await this.prismaService.wallet.findUnique({
-      where: {
-        user_id: workerId,
-      },
-    });
+        const wallet = await this.prismaService.wallet.findUnique({
+          where: {
+            user_id: workerId,
+          },
+        });
 
-    if (!wallet) {
-      throw new HttpException('Wallet tidak ditemukan', 404);
-    }
+        if (!wallet) {
+          throw new HttpException('Wallet tidak ditemukan', 404);
+        }
 
-    if (
-      WalletStatus.CLOSED == wallet.status ||
-      WalletStatus.SUSPENDED == wallet.status
-    ) {
-      throw new HttpException(
-        `Gagal melamar pekerjaan, status dompet anda: ${wallet.status}, silahkan hubungi admin`,
-        400,
-      );
-    }
+        if (
+          WalletStatus.CLOSED == wallet.status ||
+          WalletStatus.SUSPENDED == wallet.status
+        ) {
+          throw new HttpException(
+            `Gagal melamar pekerjaan, status dompet anda: ${wallet.status}, silahkan hubungi admin`,
+            400,
+          );
+        }
 
-    // Buat application
-    const application = await this.prismaService.jobApplication.create({
-      data: {
-        job_id: jobId,
-        worker_id: workerId,
-        cover_letter: applyRequest.cover_letter,
-        status: ApplicationStatus.PENDING,
-      },
-      include: {
-        job: {
+        // Buat application
+        const application = await this.prismaService.jobApplication.create({
+          data: {
+            job_id: jobId,
+            worker_id: workerId,
+            cover_letter: applyRequest.cover_letter,
+            status: ApplicationStatus.PENDING,
+          },
           include: {
-            provider: {
-              select: {
-                id: true,
-                full_name: true,
-                profile_picture_url: true,
-                average_rating: true,
+            job: {
+              include: {
+                provider: {
+                  select: {
+                    id: true,
+                    full_name: true,
+                    profile_picture_url: true,
+                    average_rating: true,
+                  },
+                },
               },
             },
           },
-        },
-      },
-    });
+        });
 
-    return this.mapToApplicationResponse(application);
+        return this.mapToApplicationResponse(application);
+      },
+    );
   }
 
   async getJobApplications(

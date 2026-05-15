@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   Global,
   MiddlewareConsumer,
@@ -20,13 +21,18 @@ import { BullModule } from '@nestjs/bull';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import {
+  createWinstonFormat,
+  getWinstonLogLevel,
+} from '../observability/logger.format';
+import { RequestContextMiddleware } from '../observability/request-context.middleware';
 
 @Global()
 @Module({
   imports: [
     WinstonModule.forRoot({
-      level: 'debug',
-      format: winston.format.json(),
+      level: getWinstonLogLevel(),
+      format: createWinstonFormat(),
       transports: [new winston.transports.Console()],
     }),
     ConfigModule.forRoot({
@@ -69,6 +75,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
     JwtService,
     PrismaService,
     ValidationService,
+    RequestContextMiddleware,
     {
       provide: APP_FILTER,
       useClass: ErrorFilter,
@@ -77,16 +84,24 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
       provide: APP_GUARD,
       useClass: RoleGuard,
     },
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
+    ...(process.env.NODE_ENV === 'production'
+      ? [
+          {
+            provide: APP_GUARD,
+            useClass: ThrottlerGuard,
+          },
+        ]
+      : []),
   ],
   exports: [PrismaService, ValidationService],
 })
 // implementasi authentikasi JWT
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(RequestContextMiddleware)
+      .forRoutes({ path: '*path', method: RequestMethod.ALL });
+
     consumer
       .apply(AuthMiddleware)
       .exclude({

@@ -1,11 +1,19 @@
+import './tracing.js';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import {
+  WINSTON_MODULE_NEST_PROVIDER,
+  WINSTON_MODULE_PROVIDER,
+} from 'nest-winston';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
+  app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
 
   // Security Headers
   app.use(
@@ -165,7 +173,11 @@ Success response mengikuti format:
   });
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`🚀 Application is running on: http://localhost:${port}`);
-  console.log(`📚 Swagger documentation: http://localhost:${port}/api/docs`);
+  const logger = app.get(WINSTON_MODULE_PROVIDER);
+  logger.info('application_started', {
+    port,
+    url: `http://localhost:${port}`,
+    docsUrl: `http://localhost:${port}/api/docs`,
+  });
 }
 void bootstrap();

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Module } from '@nestjs/common';
 import { UserModule } from './modules/user/user.module';
 import { CommonModule } from './common/common.module';
@@ -14,9 +15,11 @@ import { ReportModule } from './modules/report/report.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { LocationModule } from './modules/location/location.module';
 import { ReviewModule } from './modules/review/review.module';
+import { ObservabilityModule } from './observability/observability.module';
 
 @Module({
   imports: [
+    ObservabilityModule,
     CommonModule,
     UserModule,
     UserPhotoModule,
@@ -44,4 +47,4 @@ import { ReviewModule } from './modules/review/review.module';
   controllers: [],
   providers: [CronService],
 })
-export class AppModule { }
+export class AppModule {}

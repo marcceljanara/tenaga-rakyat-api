@@ -3,35 +3,71 @@ import {
   Catch,
   ExceptionFilter,
   HttpException,
+  Inject,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { ZodError } from 'zod';
+import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
+import type { Logger } from 'winston';
+import { RequestContextService } from '../observability/request-context.service';
+import { sanitizeLogValue } from '../observability/log-sanitizer';
 
-@Catch(ZodError, HttpException)
+@Catch()
 export class ErrorFilter implements ExceptionFilter {
+  constructor(
+    @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
+  ) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+    const status = this.getStatus(exception);
+    const errorResponse = this.getErrorResponse(exception);
 
+    RequestContextService.set({
+      method: request.method,
+      path: request.originalUrl,
+      statusCode: status,
+    });
+
+    this.logger.error('http_exception', {
+      method: request.method,
+      path: request.originalUrl,
+      statusCode: status,
+      error: errorResponse,
+    });
+
+    response.status(status).json({
+      errors: errorResponse,
+    });
+  }
+
+  private getStatus(exception: unknown): number {
     if (exception instanceof HttpException) {
-      const status = exception.getStatus();
-      const errorResponse = exception.getResponse();
-      response.status(status).json({
-        errors: errorResponse,
-      });
-    } else if (exception instanceof ZodError) {
-      response.status(400).json({
-        errors: exception.message, // bisa juga pakai exception.flatten() untuk detail
-      });
-    } else if (exception instanceof Error) {
-      response.status(500).json({
-        errors: exception.message,
-      });
-    } else {
-      // fallback jika benar-benar unknown (bukan Error)
-      response.status(500).json({
-        errors: 'Unknown error occurred',
-      });
+      return exception.getStatus();
     }
+
+    if (exception instanceof ZodError) {
+      return 400;
+    }
+
+    return 500;
+  }
+
+  private getErrorResponse(exception: unknown): unknown {
+    if (exception instanceof HttpException) {
+      return sanitizeLogValue(exception.getResponse());
+    }
+
+    if (exception instanceof ZodError) {
+      return sanitizeLogValue(exception.message);
+    }
+
+    if (exception instanceof Error) {
+      return sanitizeLogValue(exception.message);
+    }
+
+    return 'Unknown error occurred';
   }
 }

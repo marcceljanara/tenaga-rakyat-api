@@ -49,6 +49,9 @@ import { CryptoUtil } from '../../common/crypto.util';
 import { dec } from '../../common/decimal.util';
 import { ROLES } from '../../common/role/role';
 import { WebResponse } from '../../model/web.model';
+import crypto from 'crypto';
+import { observabilityMetrics } from '../../observability/metrics';
+import { runWithSpan } from '../../observability/tracing.util';
 
 @Injectable()
 export class PaymentService {
@@ -130,33 +133,47 @@ export class PaymentService {
   }
 
   async handleCallback(body: TopupCallbackRequest) {
-    const isValid = this.midtransService.verifySignature(
-      body.order_id,
-      body.status_code,
-      body.gross_amount,
-      body.signature_key,
+    return runWithSpan(
+      'midtrans.wallet_callback',
+      { 'app.payment.operation': 'wallet_callback' },
+      async () => {
+        const isValid = this.midtransService.verifySignature(
+          body.order_id,
+          body.status_code,
+          body.gross_amount,
+          body.signature_key,
+        );
+
+        if (!isValid) {
+          observabilityMetrics.recordMidtransRequest({
+            operation: 'wallet_callback',
+            result: 'failed',
+          });
+          throw new UnauthorizedException('Invalid signature');
+        }
+
+        const orderId: number = Number(body.order_id);
+        const grossAmount: number = Number(body.gross_amount);
+
+        if (body.transaction_status === 'settlement') {
+          await this.completeTopup(orderId, grossAmount);
+        } else if (
+          body.transaction_status === 'cancel' ||
+          body.transaction_status === 'deny' ||
+          body.transaction_status === 'expire'
+        ) {
+          await this.prismaService.transaction.updateMany({
+            where: { id: orderId, status: TransactonStatus.PENDING },
+            data: { status: TransactonStatus.FAILED },
+          });
+        }
+        observabilityMetrics.recordMidtransRequest({
+          operation: 'wallet_callback',
+          result: 'success',
+        });
+        return { success: true };
+      },
     );
-
-    if (!isValid) {
-      throw new UnauthorizedException('Invalid signature');
-    }
-
-    const orderId: number = Number(body.order_id);
-    const grossAmount: number = Number(body.gross_amount);
-
-    if (body.transaction_status === 'settlement') {
-      await this.completeTopup(orderId, grossAmount);
-    } else if (
-      body.transaction_status === 'cancel' ||
-      body.transaction_status === 'deny' ||
-      body.transaction_status === 'expire'
-    ) {
-      await this.prismaService.transaction.updateMany({
-        where: { id: orderId, status: TransactonStatus.PENDING },
-        data: { status: TransactonStatus.FAILED },
-      });
-    }
-    return { success: true };
   }
 
   async completeTopup(orderId: number, grossAmount: number) {
@@ -1145,43 +1162,59 @@ export class PaymentService {
   }
 
   async handleCallbackCredit(body: TopupCallbackRequest) {
-    const isValid = this.midtransService.verifySignature(
-      body.order_id,
-      body.status_code,
-      body.gross_amount,
-      body.signature_key,
+    return runWithSpan(
+      'midtrans.credit_callback',
+      { 'app.payment.operation': 'credit_callback' },
+      async () => {
+        const isValid = this.midtransService.verifySignature(
+          body.order_id,
+          body.status_code,
+          body.gross_amount,
+          body.signature_key,
+        );
+
+        if (!isValid) {
+          observabilityMetrics.recordMidtransRequest({
+            operation: 'credit_callback',
+            result: 'failed',
+          });
+          throw new UnauthorizedException('Invalid signature');
+        }
+
+        const orderId = body.order_id;
+
+        switch (body.transaction_status) {
+          case 'settlement':
+            await this.completeTopupCredit(orderId, body);
+            break;
+
+          case 'expire':
+            await this.markExpired(orderId);
+            break;
+          case 'cancel':
+            await this.markFailed(orderId);
+            break;
+
+          case 'deny':
+            await this.markFailed(orderId);
+            break;
+
+          case 'pending':
+            break;
+
+          default:
+            this.logger.warn('midtrans_credit_callback_unhandled_status', {
+              transactionStatus: body.transaction_status,
+            });
+        }
+
+        observabilityMetrics.recordMidtransRequest({
+          operation: 'credit_callback',
+          result: 'success',
+        });
+        return { success: true };
+      },
     );
-
-    if (!isValid) {
-      throw new UnauthorizedException('Invalid signature');
-    }
-
-    const orderId = body.order_id;
-
-    switch (body.transaction_status) {
-      case 'settlement':
-        await this.completeTopupCredit(orderId, body);
-        break;
-
-      case 'expire':
-        await this.markExpired(orderId);
-        break;
-      case 'cancel':
-        await this.markFailed(orderId);
-        break;
-
-      case 'deny':
-        await this.markFailed(orderId);
-        break;
-
-      case 'pending':
-        break;
-
-      default:
-        console.warn('Unhandled Midtrans status:', body.transaction_status);
-    }
-
-    return { success: true };
   }
 
   async markExpired(orderId: string) {
@@ -1280,7 +1313,7 @@ export class PaymentService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
-    console.log('Topup success:', orderId);
+    this.logger.info('posting_credit_topup_completed', { orderId });
   }
 
   async getPostingCreditPurchaseByUserId(
