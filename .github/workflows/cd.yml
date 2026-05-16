@@ -53,6 +53,16 @@ jobs:
               APP_DIR="$HOME/tenaga-rakyat-api"
             fi
 
+            if [ -z "${LETSENCRYPT_EMAIL:-}" ] && [ -f "${APP_DIR}/.env" ]; then
+              email_line="$(sed -n 's/^LETSENCRYPT_EMAIL=//p' "${APP_DIR}/.env" | tail -n 1)"
+              LETSENCRYPT_EMAIL="$(printf '%s' "$email_line" | tr -d "'\"")"
+            fi
+
+            if [ -z "${LETSENCRYPT_EMAIL:-}" ]; then
+              echo "ERROR: LETSENCRYPT_EMAIL is required. Set the GitHub secret or add it to the VPS .env file."
+              exit 1
+            fi
+
             compose() {
               docker compose -f docker-compose.yml -f docker-compose.prod.yml "$@"
             }
@@ -88,17 +98,7 @@ jobs:
             if [ -f "$cert_path" ]; then
               echo "SSL certificate already exists"
             else
-              if [ -z "${LETSENCRYPT_EMAIL:-}" ]; then
-                email_line="$(sed -n 's/^LETSENCRYPT_EMAIL=//p' .env | tail -n 1)"
-                LETSENCRYPT_EMAIL="$(printf '%s' "$email_line" | tr -d "'\"")"
-              fi
-
-              if [ -z "${LETSENCRYPT_EMAIL:-}" ]; then
-                echo "LETSENCRYPT_EMAIL is required. Add it to GitHub secrets or the VPS .env file."
-                exit 1
-              fi
-
-              echo "Requesting SSL certificate for $DOMAIN"
+              echo "Requesting SSL certificate for $DOMAIN (email: $LETSENCRYPT_EMAIL)"
               compose stop nginx || true
               sleep 3
               compose run --rm --publish 80:80 --entrypoint certbot certbot certonly \
