@@ -1,7 +1,10 @@
-name: Continous Integration
+name: Continuous Integration
 
 on:
   pull_request:
+    branches:
+      - master
+  push:
     branches:
       - master
 
