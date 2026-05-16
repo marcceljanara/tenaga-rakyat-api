@@ -109,20 +109,18 @@ jobs:
             docker volume create "$vol_www" > /dev/null 2>&1 || true
 
             echo "   [5.3] Checking existing certificate..."
-            certbot_log="/tmp/certbot_$$"
-            docker run --rm \
-              -v "${vol_etc}:/etc/letsencrypt" \
-              certbot/certbot:latest \
-              --verbose certificates --domain "$DOMAIN" > "$certbot_log" 2>&1 || true
-            echo "   [5.3] done — certbot log:"
-            cat "$certbot_log" || true
+            cert_path="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+            cert_status="$(docker run --rm -v "${vol_etc}:/etc/letsencrypt:ro" --entrypoint sh certbot/certbot:latest -c 'if [ -f "$1" ]; then echo exists; else echo missing; fi' sh "$cert_path")"
+            echo "   [5.3] done"
 
             cert_valid=false
-            grep -qi "VALID" "$certbot_log" 2>/dev/null && cert_valid=true || true
-            echo "   cert_valid=$cert_valid"
+            if [ "$cert_status" = "exists" ]; then
+              cert_valid=true
+            fi
+            echo "   cert_status=$cert_status"
 
             if [ "$cert_valid" = "true" ]; then
-              echo "   Certificate OK — skipping issuance"
+              echo "   Certificate OK - skipping issuance"
             else
               echo "   Freeing port 80 for standalone challenge..."
               systemctl stop nginx 2>/dev/null || true
@@ -155,8 +153,6 @@ jobs:
 
               systemctl start nginx 2>/dev/null || true
             fi
-            rm -f "$certbot_log"
-
             echo "6. Pulling base images"
             compose pull nginx certbot postgres redis || true
 
