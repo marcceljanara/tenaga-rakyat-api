@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { randomUUID } from 'crypto';
+import { fromBuffer } from 'file-type';
 
 @Injectable()
 export class ProfilePictureService {
@@ -41,16 +42,9 @@ export class ProfilePictureService {
       throw new HttpException('Profile picture file is required', 400);
     }
 
-    // Validate file type using file-type (server-side verification)
-    const { fileTypeFromBuffer } = await (eval('import("file-type")') as Promise<typeof import('file-type')>);
-    const type = await fileTypeFromBuffer(file.buffer);
-
-    const allowedMimeTypes = [
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/webp',
-    ];
+    // Validate file type using file-type v16 (CJS-compatible)
+    const type = await fromBuffer(file.buffer);
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
     if (!type || !allowedMimeTypes.includes(type.mime)) {
       throw new HttpException(
@@ -80,7 +74,7 @@ export class ProfilePictureService {
         const oldFileName = path.basename(user.profile_picture_url);
         const oldFilePath = path.join(this.uploadDir, oldFileName);
         await fs.unlink(oldFilePath);
-      } catch (error) {
+      } catch (error: any) {
         this.logger.warn(
           `Failed to delete old profile picture: ${error.message}`,
         );
@@ -126,7 +120,7 @@ export class ProfilePictureService {
       const fileName = path.basename(user.profile_picture_url);
       const filePath = path.join(this.uploadDir, fileName);
       await fs.unlink(filePath);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`Failed to delete file: ${error.message}`);
     }
 

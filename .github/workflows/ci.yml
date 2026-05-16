@@ -1,7 +1,7 @@
 name: Continous Integration
 
 on:
-  push:
+  pull_request:
     branches:
       - master
 
@@ -28,9 +28,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Use Node.js ${{ matrix.node-version}}
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version}}
       - name: Wait for Postgres to be ready
@@ -46,19 +46,23 @@ jobs:
           npx prisma generate
           npx prisma migrate deploy
           npx prisma db seed
+        env:
+          DATABASE_URL: postgres://postgres:password@localhost:5432/tenaga_rakyat
+          SUPER_ADMIN_EMAIL: super@admin.com
+          SUPER_ADMIN_PASSWORD: StrongPass123!!
       - name: Run tests
         run: npm run test
         env:
           DATABASE_URL: postgres://postgres:password@localhost:5432/tenaga_rakyat
-          JWT_SECRET : YmytJHejk1bPG2jaVyJ6jcpQ3Nel1h3xULg810alzJJ
-          MIDTRANS_SERVER_KEY : Mid-server-xxxxx
-          MIDTRANS_CLIENT_KEY : Mid-client-xxxxx
-          ENCRYPTION_KEY : 6wEM94CQ05LKRNZlipBphjQzeC0FAMlN8Vdl5VYWyTA=
-          SUPER_ADMIN_EMAIL : admin@admin.com
-          SUPER_ADMIN_PASSWORD : password
+          JWT_SECRET: YmytJHejk1bPG2jaVyJ6jcpQ3Nel1h3xULg810alzJJ
+          MIDTRANS_SERVER_KEY: Mid-server-xxxxx
+          MIDTRANS_CLIENT_KEY: Mid-client-xxxxx
+          ENCRYPTION_KEY: 6wEM94CQ05LKRNZlipBphjQzeC0FAMlN8Vdl5VYWyTA=
+          SUPER_ADMIN_EMAIL: super@admin.com
+          SUPER_ADMIN_PASSWORD: StrongPass123!!
           FRONTEND_URL: http://localhost:5173
-          EMAIL_USER : xxxxxxxxxxxsa@gmail.com
-          EMAIL_APP_PASSWORD : xxxxxxxxxxxx
-          EMAIL_FROM_NAME : Tenaga Rakyat Support
-          NODE_ENV: development 
+          EMAIL_USER: xxxxxxxxxxxsa@gmail.com
+          EMAIL_APP_PASSWORD: xxxxxxxxxxxx
+          EMAIL_FROM_NAME: Tenaga Rakyat Support
+          NODE_ENV: development
 

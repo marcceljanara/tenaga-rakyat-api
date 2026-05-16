@@ -36,7 +36,7 @@ import {
   ApiBearerAuth,
   ApiBody,
 } from '@nestjs/swagger';
-import { generateCsrfToken } from '../../common/csrf.js';
+import { generateCsrfToken } from '../../common/csrf';
 
 @ApiTags('User Authentication & Profile')
 @Controller('/api/users')

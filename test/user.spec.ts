@@ -364,8 +364,9 @@ describe('UserController', () => {
     });
 
     it('should reject if not authenticated', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/api/users/profile');
+      const response = await request(app.getHttpServer()).get(
+        '/api/users/profile',
+      );
 
       expect(response.statusCode).toBe(401);
     });
@@ -396,14 +397,16 @@ describe('UserController', () => {
     });
 
     it('should reject if not authenticated', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/api/users/profile/some-uuid');
+      const response = await request(app.getHttpServer()).get(
+        '/api/users/profile/some-uuid',
+      );
 
       expect(response.statusCode).toBe(401);
     });
 
     it('should be able to get another user profile by ID', async () => {
       const userId = await testService.addUser();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const providerId = await testService.addProvider();
 
       // Login as provider, view worker profile
@@ -521,7 +524,7 @@ describe('UserController', () => {
         .put('/api/users/profile/location')
         .set('Cookie', userCookie)
         .send({
-          latitude: -6.200000,
+          latitude: -6.2,
           longitude: 106.816666,
         });
 
@@ -586,14 +589,15 @@ describe('UserController', () => {
       await testService.addUser();
       const userCookie = await loginUser();
 
+      // Minimal valid JPEG buffer (SOI marker + APP0 marker)
+      const jpegBuffer = Buffer.from([
+        0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+      ]);
+
       const response = await request(app.getHttpServer())
         .post('/api/users/profile/picture')
         .set('Cookie', userCookie)
-        .attach(
-          'profile_picture',
-          Buffer.from('fake-image-data'),
-          'profile.jpg',
-        );
+        .attach('profile_picture', jpegBuffer, 'profile.jpg');
 
       logger.debug(response.body);
       expect(response.statusCode).toBe(200);
@@ -629,11 +633,14 @@ describe('UserController', () => {
       await testService.addUser();
       const userCookie = await loginUser();
 
-      // Upload foto dulu biar ada datanya
+      // Upload foto dulu biar ada datanya (minimal valid JPEG buffer)
+      const jpegBuffer = Buffer.from([
+        0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+      ]);
       await request(app.getHttpServer())
         .post('/api/users/profile/picture')
         .set('Cookie', userCookie)
-        .attach('profile_picture', Buffer.from('fake'), 'test.jpg')
+        .attach('profile_picture', jpegBuffer, 'test.jpg')
         .expect(200);
 
       // Action — delete foto

@@ -13,6 +13,7 @@ import { ConfigService } from '@nestjs/config';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { randomUUID } from 'crypto';
+import { fromBuffer } from 'file-type';
 
 @Injectable()
 export class UserPhotoService {
@@ -50,22 +51,19 @@ export class UserPhotoService {
     if (!file) {
       throw new HttpException('Photo file is required', 400);
     }
-    console.log(file.mimetype);
 
-    // Validate file type using file-type (server-side verification)
-    const { fileTypeFromBuffer } = await (eval('import("file-type")') as Promise<typeof import('file-type')>);
-    const type = await fileTypeFromBuffer(file.buffer);
-
+    // Validate file type using file-type v16 (CJS-compatible)
+    const type = await fromBuffer(file.buffer);
     const allowedMimeTypes = [
       'image/jpeg',
-      'image/jpg',
       'image/png',
       'image/webp',
+      'image/jpg',
     ];
 
     if (!type || !allowedMimeTypes.includes(type.mime)) {
       throw new HttpException(
-        'Invalid file type. Only JPEG, PNG, and WebP are allowed',
+        'Invalid file type. Only JPEG, PNG, WebP, and JPG are allowed',
         422,
       );
     }
@@ -213,7 +211,7 @@ export class UserPhotoService {
       const fileName = path.basename(photo.photo_url);
       const filePath = path.join(this.uploadDir, fileName);
       await fs.unlink(filePath);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`Failed to delete file: ${error.message}`);
     }
 

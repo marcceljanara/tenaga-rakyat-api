@@ -63,7 +63,7 @@ import { PaginationQueryDto } from '../../common/pagination.dto';
 @Throttle({ default: { limit: 10, ttl: 60000 } })
 @Controller('/api')
 export class PaymentController {
-  constructor(private paymentService: PaymentService) { }
+  constructor(private paymentService: PaymentService) {}
 
   @Post('/admin/wallets/balance-initial')
   @HttpCode(200)

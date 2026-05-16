@@ -354,8 +354,9 @@ describe('JobController', () => {
     });
 
     it('should reject if not authenticated', async () => {
-      const response = await request(app.getHttpServer())
-        .delete(`/api/jobs/${jobId}`);
+      const response = await request(app.getHttpServer()).delete(
+        `/api/jobs/${jobId}`,
+      );
 
       expect(response.statusCode).toBe(401);
     });
@@ -403,8 +404,9 @@ describe('JobController', () => {
     });
 
     it('should reject if not authenticated', async () => {
-      const response = await request(app.getHttpServer())
-        .get(`/api/jobs/${jobId}/public`);
+      const response = await request(app.getHttpServer()).get(
+        `/api/jobs/${jobId}/public`,
+      );
 
       expect(response.statusCode).toBe(401);
     });
@@ -465,8 +467,9 @@ describe('JobController', () => {
     });
 
     it('should reject if not authenticated', async () => {
-      const response = await request(app.getHttpServer())
-        .get(`/api/jobs/${jobId}/private`);
+      const response = await request(app.getHttpServer()).get(
+        `/api/jobs/${jobId}/private`,
+      );
 
       expect(response.statusCode).toBe(401);
     });
