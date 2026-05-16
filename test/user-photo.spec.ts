@@ -13,6 +13,9 @@ describe('UserPhotoController', () => {
   let app: INestApplication;
   let logger: Logger;
   let testService: TestService;
+  const jpegBuffer = Buffer.from([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+  ]);
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -74,7 +77,7 @@ describe('UserPhotoController', () => {
         const response = await request(app.getHttpServer())
           .post('/api/users/photos')
           .set('Cookie', userCookie)
-          .attach('photo', Buffer.from('fake-image'), 'photo.jpg')
+          .attach('photo', jpegBuffer, 'photo.jpg')
           .field('description', 'My first photo');
 
         logger.debug(response.body);
@@ -100,7 +103,7 @@ describe('UserPhotoController', () => {
         await request(app.getHttpServer())
           .post('/api/users/photos')
           .set('Cookie', userCookie)
-          .attach('photo', Buffer.from('img'), 'photo.jpg')
+          .attach('photo', jpegBuffer, 'photo.jpg')
           .field('description', 'desc');
 
         const response = await request(app.getHttpServer())
@@ -127,7 +130,7 @@ describe('UserPhotoController', () => {
         const upload = await request(app.getHttpServer())
           .post('/api/users/photos')
           .set('Cookie', userCookie)
-          .attach('photo', Buffer.from('image-data'), 'ok.jpg')
+          .attach('photo', jpegBuffer, 'ok.jpg')
           .field('description', 'test get by id');
 
         const photoId = upload.body.data.id;
@@ -147,7 +150,7 @@ describe('UserPhotoController', () => {
         const upload = await request(app.getHttpServer())
           .post('/api/users/photos')
           .set('Cookie', userCookie)
-          .attach('photo', Buffer.from('image'), 'edit.jpg')
+          .attach('photo', jpegBuffer, 'edit.jpg')
           .field('description', 'desc');
 
         const photoId = upload.body.data.id;
@@ -164,7 +167,7 @@ describe('UserPhotoController', () => {
         const upload = await request(app.getHttpServer())
           .post('/api/users/photos')
           .set('Cookie', userCookie)
-          .attach('photo', Buffer.from('image'), 'edit2.jpg')
+          .attach('photo', jpegBuffer, 'edit2.jpg')
           .field('description', 'old desc');
 
         const photoId = upload.body.data.id;
@@ -193,7 +196,7 @@ describe('UserPhotoController', () => {
         const upload = await request(app.getHttpServer())
           .post('/api/users/photos')
           .set('Cookie', userCookie)
-          .attach('photo', Buffer.from('to-delete'), 'del.jpg')
+          .attach('photo', jpegBuffer, 'del.jpg')
           .field('description', 'to delete');
 
         const photoId = upload.body.data.id;

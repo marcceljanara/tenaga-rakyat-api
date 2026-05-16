@@ -43,7 +43,7 @@
     "csrf-csrf": "^4.0.3",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
-    "file-type": "^22.0.1",
+    "file-type": "^16.5.4",
     "helmet": "^8.1.0",
     "midtrans-client": "^1.4.3",
     "nest-winston": "^1.10.2",
