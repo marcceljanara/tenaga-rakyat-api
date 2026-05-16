@@ -97,6 +97,8 @@ jobs:
                 exit 1
               fi
 
+              echo "DEBUG: Using LETSENCRYPT_EMAIL=$LETSENCRYPT_EMAIL for do
+
               compose stop nginx || true
               sleep 3
               compose run --rm --publish 80:80 --entrypoint certbot certbot certonly \
