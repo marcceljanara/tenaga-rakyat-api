@@ -85,11 +85,11 @@ jobs:
 
             echo "5. Checking SSL certificate"
             cert_path="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
-            cert_status="$(
-              compose run --rm --entrypoint sh certbot \
-                -c 'if [ -f "$1" ]; then echo exists; else echo missing; fi' \
-                sh "$cert_path"
-            )"
+            if compose run --rm --no-deps --entrypoint sh certbot -c "test -f '$cert_path'" 2>/dev/null; then
+              cert_status="exists"
+            else
+              cert_status="missing"
+            fi
 
             case "$cert_status" in
               *exists*)
