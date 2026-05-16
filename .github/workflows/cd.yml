@@ -112,53 +112,43 @@ jobs:
             cert_path="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
             cert_status="$(docker run --rm -v "${vol_etc}:/etc/letsencrypt:ro" --entrypoint sh certbot/certbot:latest -c 'if [ -f "$1" ]; then echo exists; else echo missing; fi' sh "$cert_path")"
             echo "   [5.3] done"
-
             echo "   cert_status=$cert_status"
 
-            case "$cert_status" in
-              exists)
-                echo "   Certificate OK - skipping issuance"
-                ;;
-              missing)
-                echo "   Freeing port 80 for standalone challenge..."
-                systemctl stop nginx 2>/dev/null || true
-                docker ps -q --filter publish=80 | xargs -r docker stop 2>/dev/null || true
-                sleep 3
+            if [ "$cert_status" = "exists" ]; then
+              echo "   Certificate OK - skipping issuance"
+            elif [ "$cert_status" = "missing" ]; then
+              echo "   Freeing port 80 for standalone challenge..."
+              systemctl stop nginx 2>/dev/null || true
+              docker ps -q --filter publish=80 | xargs -r docker stop 2>/dev/null || true
+              sleep 3
 
-                echo "   Running certbot standalone (output captured)..."
-                standalone_log="/tmp/certbot_standalone_$$"
-                certbot_exit=0
-                docker run --rm \
-                  -p 80:80 \
-                  -v "${vol_etc}:/etc/letsencrypt" \
-                  -v "${vol_www}:/var/www/certbot" \
-                  certbot/certbot:latest \
-                  --verbose certonly --standalone \
-                  -d "$DOMAIN" \
-                  --email "$LETSENCRYPT_EMAIL" \
-                  --agree-tos --no-eff-email --non-interactive \
-                  > "$standalone_log" 2>&1 || certbot_exit=$?
+              echo "   Running certbot standalone (output captured)..."
+              standalone_log="/tmp/certbot_standalone_$$"
+              certbot_exit=0
+              docker run --rm \
+                -p 80:80 \
+                -v "${vol_etc}:/etc/letsencrypt" \
+                -v "${vol_www}:/var/www/certbot" \
+                certbot/certbot:latest \
+                --verbose certonly --standalone \
+                -d "$DOMAIN" \
+                --email "$LETSENCRYPT_EMAIL" \
+                --agree-tos --no-eff-email --non-interactive \
+                > "$standalone_log" 2>&1 || certbot_exit=$?
 
-                echo "   Certbot standalone output:"
-                cat "$standalone_log" || true
-                rm -f "$standalone_log"
+              echo "   Certbot standalone output:"
+              cat "$standalone_log" || true
+              rm -f "$standalone_log"
 
-                case "$certbot_exit" in
-                  0)
-                    systemctl start nginx 2>/dev/null || true
-                    ;;
-                  *)
-                    systemctl start nginx 2>/dev/null || true
-                    echo "ERROR: certbot standalone failed with exit code $certbot_exit"
-                    exit 1
-                    ;;
-                esac
-                ;;
-              *)
-                echo "ERROR: unexpected certificate status: $cert_status"
+              systemctl start nginx 2>/dev/null || true
+              if [ "$certbot_exit" -ne 0 ]; then
+                echo "ERROR: certbot standalone failed with exit code $certbot_exit"
                 exit 1
-                ;;
-            esac
+              fi
+            else
+              echo "ERROR: unexpected certificate status: $cert_status"
+              exit 1
+            fi
             echo "6. Pulling base images"
             compose pull nginx certbot postgres redis || true
 
