@@ -112,19 +112,22 @@ jobs:
               -v "${vol_etc}:/etc/letsencrypt:ro" \
               certbot/certbot:latest \
               certificates --domain "$DOMAIN" > "$certbot_log" 2>&1 || true
-            echo "   [5.3] done"
+            echo "   [5.3] done — certbot log:"
+            cat "$certbot_log" || true
 
-            if grep -qi "VALID" "$certbot_log" 2>/dev/null; then
+            cert_valid=false
+            grep -qi "VALID" "$certbot_log" 2>/dev/null && cert_valid=true || true
+            echo "   cert_valid=$cert_valid"
+
+            if [ "$cert_valid" = "true" ]; then
               echo "   Certificate OK — skipping issuance"
             else
-              echo "   Certificate not found. Certbot output:"
-              cat "$certbot_log" || true
-
               echo "   Freeing port 80 for standalone challenge..."
               systemctl stop nginx 2>/dev/null || true
               docker ps -q --filter publish=80 | xargs -r docker stop 2>/dev/null || true
               sleep 2
 
+              echo "   Running certbot standalone..."
               docker run --rm \
                 -p 80:80 \
                 -v "${vol_etc}:/etc/letsencrypt" \
@@ -134,7 +137,7 @@ jobs:
                 -d "$DOMAIN" \
                 --email "$LETSENCRYPT_EMAIL" \
                 --agree-tos --no-eff-email --non-interactive \
-              || { systemctl start nginx 2>/dev/null || true; echo "ERROR: certbot failed — check domain DNS and port 80 accessibility"; exit 1; }
+              || { systemctl start nginx 2>/dev/null || true; echo "ERROR: certbot failed"; exit 1; }
 
               systemctl start nginx 2>/dev/null || true
             fi
