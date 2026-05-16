@@ -35,6 +35,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      network: host
     container_name: tenaga-rakyat-api
     restart: always
     ports:
