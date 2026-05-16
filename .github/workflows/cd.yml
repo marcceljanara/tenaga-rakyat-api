@@ -113,7 +113,7 @@ jobs:
             docker run --rm \
               -v "${vol_etc}:/etc/letsencrypt" \
               certbot/certbot:latest \
-              certificates --domain "$DOMAIN" > "$certbot_log" 2>&1 || true
+              --verbose certificates --domain "$DOMAIN" > "$certbot_log" 2>&1 || true
             echo "   [5.3] done — certbot log:"
             cat "$certbot_log" || true
 
@@ -137,7 +137,7 @@ jobs:
                 -v "${vol_etc}:/etc/letsencrypt" \
                 -v "${vol_www}:/var/www/certbot" \
                 certbot/certbot:latest \
-                certonly --standalone \
+                --verbose certonly --standalone \
                 -d "$DOMAIN" \
                 --email "$LETSENCRYPT_EMAIL" \
                 --agree-tos --no-eff-email --non-interactive \
