@@ -3,7 +3,7 @@ name: Continuous Deployment
 on:
   workflow_run:
     workflows:
-      - Continous Integration
+      - Continuous Integration
     types:
       - completed
     branches:
@@ -18,7 +18,7 @@ jobs:
   deploy:
     name: Deploy to Production VPS
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master')
     environment: production
 
     env:
