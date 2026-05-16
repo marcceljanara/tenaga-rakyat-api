@@ -97,7 +97,7 @@ jobs:
                 exit 1
               fi
 
-              echo "DEBUG: Using LETSENCRYPT_EMAIL=$LETSENCRYPT_EMAIL for do
+              echo "DEBUG: Using LETSENCRYPT_EMAIL=$LETSENCRYPT_EMAIL for do"
 
               compose stop nginx || true
               sleep 3
