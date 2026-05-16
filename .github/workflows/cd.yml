@@ -95,9 +95,8 @@ jobs:
 
             echo "5. Checking SSL certificate"
 
-            echo "   Starting nginx and certbot services first..."
-            compose up -d --no-build nginx certbot || true
-            sleep 5
+            echo "   Pulling certbot image..."
+            docker pull certbot/certbot:latest
 
             echo "   Checking certificate in Docker volume..."
             cert_check="$(compose run --rm --no-deps \
@@ -109,13 +108,15 @@ jobs:
             if echo "$cert_check" | grep -qi "VALID"; then
               echo "   Valid SSL certificate already exists"
             else
-              echo "   Requesting new SSL certificate for $DOMAIN via webroot"
+              echo "   No valid certificate found, requesting via standalone mode..."
+              compose stop nginx 2>/dev/null || true
+              sleep 2
               compose run --rm --no-deps \
+                --publish 80:80 \
                 --entrypoint certbot \
                 certbot \
                 certonly \
-                --webroot \
-                --webroot-path /var/www/certbot \
+                --standalone \
                 -d "$DOMAIN" \
                 --email "$LETSENCRYPT_EMAIL" \
                 --agree-tos \
