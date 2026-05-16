@@ -95,14 +95,19 @@ jobs:
 
             echo "5. Checking SSL certificate"
 
-            echo "   Pulling certbot image..."
-            docker pull certbot/certbot:latest
+            project_name="$(basename "${APP_DIR%/}")"
+            certbot_etc_vol="${project_name}_certbot-etc"
+            certbot_www_vol="${project_name}_certbot-www"
+
+            echo "   Ensuring certbot volumes exist (project: $project_name)..."
+            docker volume create "$certbot_etc_vol" > /dev/null || true
+            docker volume create "$certbot_www_vol" > /dev/null || true
 
             echo "   Checking certificate in Docker volume..."
-            certbot_log="/tmp/certbot_check.txt"
-            compose run --rm --no-deps \
-              --entrypoint certbot \
-              certbot \
+            certbot_log="/tmp/certbot_check_$$.txt"
+            docker run --rm \
+              -v "${certbot_etc_vol}:/etc/letsencrypt:ro" \
+              certbot/certbot:latest \
               certificates \
               --domain "$DOMAIN" > "$certbot_log" 2>&1 || true
 
@@ -114,10 +119,11 @@ jobs:
               echo "   Requesting new SSL certificate for $DOMAIN via standalone mode..."
               compose stop nginx 2>/dev/null || true
               sleep 2
-              compose run --rm --no-deps \
+              docker run --rm \
                 --publish 80:80 \
-                --entrypoint certbot \
-                certbot \
+                -v "${certbot_etc_vol}:/etc/letsencrypt" \
+                -v "${certbot_www_vol}:/var/www/certbot" \
+                certbot/certbot:latest \
                 certonly \
                 --standalone \
                 -d "$DOMAIN" \
