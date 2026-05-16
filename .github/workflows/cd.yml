@@ -65,7 +65,7 @@ jobs:
             echo "2. Preparing application directory: $APP_DIR"
             if [ ! -d "$APP_DIR/.git" ]; then
               mkdir -p "$APP_DIR"
-              git clone --branch "$DEPLOY_BRANCH" "https://github.com/$REPOSITORY.git" "$APP_DIR"
+              git clone --branch "$DEPLOY_BRANCH" "https://github.com/$REPOSITORY.git" "$APP_DIR" || true
             fi
 
             cd "$APP_DIR"
