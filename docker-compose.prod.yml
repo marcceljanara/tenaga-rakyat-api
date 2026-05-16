@@ -1,17 +1,20 @@
 services:
   postgres:
     ports: !reset []
+    networks:
+      - app-network
 
   redis:
     ports: !reset []
+    networks:
+      - app-network
 
   api:
-    ports: !reset []
-    expose:
-      - "3000"
     environment:
       NODE_ENV: production
       PORT: "3000"
+    networks:
+      - app-network
 
   nginx:
     image: nginx:1.27-alpine
@@ -29,6 +32,8 @@ services:
     command: >
       /bin/sh -c 'while :; do sleep 6h; nginx -s reload; done &
       nginx -g "daemon off;"'
+    networks:
+      - app-network
 
   certbot:
     image: certbot/certbot:latest
@@ -41,7 +46,13 @@ services:
     command: >
       -c "trap exit TERM; while :; do certbot renew --webroot
       -w /var/www/certbot --quiet; sleep 12h; done;"
+    networks:
+      - app-network
 
 volumes:
   certbot-etc:
   certbot-www:
+
+networks:
+  app-network:
+    name: tenaga-rakyat-network

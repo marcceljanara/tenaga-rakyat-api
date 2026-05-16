@@ -16,6 +16,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - app-network
 
   redis:
     image: redis:7-alpine
@@ -30,6 +32,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - app-network
 
   api:
     build:
@@ -38,29 +42,29 @@ services:
       network: host
     container_name: tenaga-rakyat-api
     restart: always
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     env_file:
       - .env
     environment:
-      # Internal Docker URLs
       DATABASE_URL: ${DOCKER_DATABASE_URL}
-      # Update these variables based on your actual application .env expectations for Redis config
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
-      # Include any other essential production environment variables below
-      # JWT_SECRET: "your_secret_here"
     volumes:
-      # Uploads persist in docker managed volume mapped to /app/uploads
       - uploads-data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - app-network
 
 volumes:
-  # Using named volumes is the best practice for persistency in Docker and VPS deployments
   postgres-data:
   redis-data:
   uploads-data:
+
+networks:
+  app-network:
+    name: tenaga-rakyat-network
