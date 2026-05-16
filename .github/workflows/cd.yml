@@ -85,40 +85,30 @@ jobs:
 
             echo "5. Checking SSL certificate"
             cert_path="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
-            if compose run --rm --no-deps --entrypoint sh certbot -c "test -f '$cert_path'" 2>/dev/null; then
-              cert_status="exists"
+            if [ -f "$cert_path" ]; then
+              echo "SSL certificate already exists"
             else
-              cert_status="missing"
+              if [ -z "${LETSENCRYPT_EMAIL:-}" ]; then
+                email_line="$(sed -n 's/^LETSENCRYPT_EMAIL=//p' .env | tail -n 1)"
+                LETSENCRYPT_EMAIL="$(printf '%s' "$email_line" | tr -d "'\"")"
+              fi
+
+              if [ -z "${LETSENCRYPT_EMAIL:-}" ]; then
+                echo "LETSENCRYPT_EMAIL is required. Add it to GitHub secrets or the VPS .env file."
+                exit 1
+              fi
+
+              echo "Requesting SSL certificate for $DOMAIN"
+              compose stop nginx || true
+              sleep 3
+              compose run --rm --publish 80:80 --entrypoint certbot certbot certonly \
+                --standalone \
+                -d "$DOMAIN" \
+                --email "$LETSENCRYPT_EMAIL" \
+                --agree-tos \
+                --no-eff-email \
+                --non-interactive
             fi
-
-            case "$cert_status" in
-              *exists*)
-                echo "SSL certificate already exists"
-                ;;
-              *)
-                if [ -z "${LETSENCRYPT_EMAIL:-}" ]; then
-                  email_line="$(sed -n 's/^LETSENCRYPT_EMAIL=//p' .env | tail -n 1)"
-                  LETSENCRYPT_EMAIL="$(printf '%s' "$email_line" | tr -d "'\"")"
-                fi
-
-                if [ -z "${LETSENCRYPT_EMAIL:-}" ]; then
-                  echo "LETSENCRYPT_EMAIL is required. Add it to GitHub secrets or the VPS .env file."
-                  exit 1
-                fi
-
-                echo "Requesting SSL certificate for $DOMAIN"
-
-                compose stop nginx || true
-                sleep 3
-                compose run --rm --publish 80:80 --entrypoint certbot certbot certonly \
-                  --standalone \
-                  -d "$DOMAIN" \
-                  --email "$LETSENCRYPT_EMAIL" \
-                  --agree-tos \
-                  --no-eff-email \
-                  --non-interactive
-                ;;
-            esac
 
             echo "6. Pulling base images"
             compose pull nginx certbot postgres redis || true
