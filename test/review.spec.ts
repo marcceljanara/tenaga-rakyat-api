@@ -41,7 +41,10 @@ describe('ReviewController', () => {
     await app.close();
   });
 
-  async function loginAs(email: string, password = '1234test'): Promise<string[]> {
+  async function loginAs(
+    email: string,
+    password = '1234test',
+  ): Promise<string[]> {
     const login = await request(app.getHttpServer())
       .post('/api/users/login')
       .send({ email, password });
@@ -231,7 +234,11 @@ describe('ReviewController', () => {
       await request(app.getHttpServer())
         .post('/api/reviews')
         .set('Cookie', workerCookie)
-        .send({ job_id: approvedJobId, rating: 4, comment: 'Pemberi kerja baik' });
+        .send({
+          job_id: approvedJobId,
+          rating: 4,
+          comment: 'Pemberi kerja baik',
+        });
 
       const response = await request(app.getHttpServer())
         .get(`/api/reviews/job/${approvedJobId}`)

@@ -1087,9 +1087,7 @@ describe('PaymentController', () => {
       logger.debug(response.body);
       expect(response.statusCode).toBe(200);
       expect(
-        response.body.data.requests.every(
-          (r: any) => r.status === 'PENDING',
-        ),
+        response.body.data.requests.every((r: any) => r.status === 'PENDING'),
       ).toBe(true);
     });
 
