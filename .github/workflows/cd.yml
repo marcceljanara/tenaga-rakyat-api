@@ -98,6 +98,7 @@ jobs:
               fi
 
               compose stop nginx || true
+              sleep 3
               compose run --rm --publish 80:80 --entrypoint certbot certbot certonly \
                 --standalone \
                 -d "$DOMAIN" \
