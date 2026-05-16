@@ -65,7 +65,7 @@ jobs:
             echo "2. Preparing application directory: $APP_DIR"
             if [ ! -d "$APP_DIR/.git" ]; then
               mkdir -p "$APP_DIR"
-              git clone --branch "$DEPLOY_BRANCH" "https://github.com/$REPOSITORY.git" "$APP_DIR" || true
+              git clone --branch "$DEPLOY_BRANCH" "https://github.com/$REPOSITORY.git" "$APP_DIR"
             fi
 
             cd "$APP_DIR"
@@ -84,7 +84,12 @@ jobs:
             compose config --quiet
 
             echo "5. Checking SSL certificate"
-            cert_status="$(compose run --rm --entrypoint sh certbot -c "if [ -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem ]; then echo exists; else echo missing; fi")"
+            cert_path="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+            cert_status="$(
+              compose run --rm --entrypoint sh certbot \
+                -c 'if [ -f "$1" ]; then echo exists; else echo missing; fi' \
+                sh "$cert_path"
+            )"
 
             case "$cert_status" in
               *exists*)
