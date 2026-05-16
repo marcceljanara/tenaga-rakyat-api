@@ -95,19 +95,28 @@ jobs:
 
             echo "5. Checking SSL certificate"
             cert_path="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+
+            echo "   Pulling certbot image..."
+            compose pull --quiet certbot || true
+
             if [ -f "$cert_path" ]; then
-              echo "SSL certificate already exists"
+              echo "   Certificate already exists: $cert_path"
             else
-              echo "Requesting SSL certificate for $DOMAIN (email: $LETSENCRYPT_EMAIL)"
+              echo "   No certificate found, requesting for: $DOMAIN"
               compose stop nginx || true
               sleep 3
-              compose run --rm --publish 80:80 --entrypoint certbot certbot certonly \
+              compose run --rm --no-deps \
+                --publish 80:80 \
+                --entrypoint certbot \
+                certbot \
+                certonly \
                 --standalone \
                 -d "$DOMAIN" \
                 --email "$LETSENCRYPT_EMAIL" \
                 --agree-tos \
                 --no-eff-email \
-                --non-interactive
+                --non-interactive \
+              || { echo "ERROR: certbot failed to obtain certificate for $DOMAIN"; exit 1; }
             fi
 
             echo "6. Pulling base images"
