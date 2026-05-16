@@ -48,6 +48,7 @@ jobs:
           script_stop: true
           script: |
             set -eu
+            trap 'echo "DEPLOY ERROR at line $LINENO — command: $BASH_COMMAND"' ERR
 
             if [ -z "${APP_DIR:-}" ]; then
               APP_DIR="$HOME/tenaga-rakyat-api"
@@ -95,18 +96,23 @@ jobs:
 
             echo "5. Provisioning SSL certificate"
 
+            echo "   [5.1] Resolving project name..."
             project_name="$(basename "${APP_DIR%/}")"
             vol_etc="${project_name}_certbot-etc"
             vol_www="${project_name}_certbot-www"
+            echo "   Project: $project_name | vol_etc: $vol_etc"
 
+            echo "   [5.2] Creating volumes..."
             docker volume create "$vol_etc" > /dev/null 2>&1 || true
             docker volume create "$vol_www" > /dev/null 2>&1 || true
 
+            echo "   [5.3] Checking existing certificate..."
             certbot_log="/tmp/certbot_$$"
             docker run --rm \
               -v "${vol_etc}:/etc/letsencrypt:ro" \
               certbot/certbot:latest \
               certificates --domain "$DOMAIN" > "$certbot_log" 2>&1 || true
+            echo "   [5.3] done"
 
             if grep -qi "VALID" "$certbot_log" 2>/dev/null; then
               echo "   Certificate OK — skipping issuance"
