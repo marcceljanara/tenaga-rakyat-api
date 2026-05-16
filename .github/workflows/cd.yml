@@ -22,29 +22,25 @@ jobs:
     environment: production
 
     env:
-      DOMAIN: api.tenagarakyat.site
       DEPLOY_BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
       DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
       REPOSITORY: ${{ github.repository }}
       APP_DIR: ${{ secrets.DEPLOY_PATH }}
-      LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
 
     steps:
       - name: Deploy application on VPS
         uses: appleboy/ssh-action@v1.2.0
         env:
-          DOMAIN: ${{ env.DOMAIN }}
           DEPLOY_BRANCH: ${{ env.DEPLOY_BRANCH }}
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
           REPOSITORY: ${{ env.REPOSITORY }}
           APP_DIR: ${{ env.APP_DIR }}
-          LETSENCRYPT_EMAIL: ${{ env.LETSENCRYPT_EMAIL }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          envs: DOMAIN,DEPLOY_BRANCH,DEPLOY_SHA,REPOSITORY,APP_DIR,LETSENCRYPT_EMAIL
+          envs: DEPLOY_BRANCH,DEPLOY_SHA,REPOSITORY,APP_DIR
           script_stop: true
           script: |
             set -eu
@@ -54,16 +50,6 @@ jobs:
 
             if [ -z "${APP_DIR:-}" ]; then
               APP_DIR="$HOME/tenaga-rakyat-api"
-            fi
-
-            if [ -z "${LETSENCRYPT_EMAIL:-}" ] && [ -f "${APP_DIR}/.env" ]; then
-              email_line="$(sed -n 's/^LETSENCRYPT_EMAIL=//p' "${APP_DIR}/.env" | tail -n 1)"
-              LETSENCRYPT_EMAIL="$(printf '%s' "$email_line" | tr -d "'\"")"
-            fi
-
-            if [ -z "${LETSENCRYPT_EMAIL:-}" ]; then
-              echo "ERROR: LETSENCRYPT_EMAIL is required. Set the GitHub secret or add it to the VPS .env file."
-              exit 1
             fi
 
             compose() {
@@ -92,71 +78,17 @@ jobs:
             test -f Dockerfile
             test -f docker-compose.yml
             test -f docker-compose.prod.yml
-            test -f nginx/conf.d/api.tenagarakyat.site.conf
             test -f .env
             compose config --quiet
 
-            echo "5. Provisioning SSL certificate"
+            echo "5. Pulling base images"
+            compose pull postgres redis || true
 
-            echo "   [5.1] Resolving project name..."
-            project_name="$(basename "${APP_DIR%/}")"
-            vol_etc="${project_name}_certbot-etc"
-            vol_www="${project_name}_certbot-www"
-            echo "   Project: $project_name | vol_etc: $vol_etc"
-
-            echo "   [5.2] Creating volumes..."
-            docker volume create "$vol_etc" > /dev/null 2>&1 || true
-            docker volume create "$vol_www" > /dev/null 2>&1 || true
-
-            echo "   [5.3] Checking existing certificate..."
-            cert_path="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
-            cert_status="$(docker run --rm -v "${vol_etc}:/etc/letsencrypt:ro" --entrypoint sh certbot/certbot:latest -c 'if [ -f "$1" ]; then echo exists; else echo missing; fi' sh "$cert_path")"
-            echo "   [5.3] done"
-            echo "   cert_status=$cert_status"
-
-            if [ "$cert_status" = "exists" ]; then
-              echo "   Certificate OK - skipping issuance"
-            elif [ "$cert_status" = "missing" ]; then
-              echo "   Freeing port 80 for standalone challenge..."
-              systemctl stop nginx 2>/dev/null || true
-              docker ps -q --filter publish=80 | xargs -r docker stop 2>/dev/null || true
-              sleep 3
-
-              echo "   Running certbot standalone (output captured)..."
-              standalone_log="/tmp/certbot_standalone_$$"
-              certbot_exit=0
-              docker run --rm \
-                -p 80:80 \
-                -v "${vol_etc}:/etc/letsencrypt" \
-                -v "${vol_www}:/var/www/certbot" \
-                certbot/certbot:latest \
-                --verbose certonly --standalone \
-                -d "$DOMAIN" \
-                --email "$LETSENCRYPT_EMAIL" \
-                --agree-tos --no-eff-email --non-interactive \
-                > "$standalone_log" 2>&1 || certbot_exit=$?
-
-              echo "   Certbot standalone output:"
-              cat "$standalone_log" || true
-              rm -f "$standalone_log"
-
-              systemctl start nginx 2>/dev/null || true
-              if [ "$certbot_exit" -ne 0 ]; then
-                echo "ERROR: certbot standalone failed with exit code $certbot_exit"
-                exit 1
-              fi
-            else
-              echo "ERROR: unexpected certificate status: $cert_status"
-              exit 1
-            fi
-            echo "6. Pulling base images"
-            compose pull nginx certbot postgres redis || true
-
-            echo "7. Building and starting production stack"
+            echo "6. Building and starting production stack"
             compose up -d --build --remove-orphans
 
-            echo "8. Current production containers"
+            echo "7. Current production containers"
             compose ps
 
-            echo "9. Cleaning unused Docker images"
+            echo "8. Cleaning unused Docker images"
             docker image prune -f
