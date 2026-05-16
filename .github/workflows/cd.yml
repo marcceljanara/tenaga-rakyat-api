@@ -109,7 +109,7 @@ jobs:
             echo "   [5.3] Checking existing certificate..."
             certbot_log="/tmp/certbot_$$"
             docker run --rm \
-              -v "${vol_etc}:/etc/letsencrypt:ro" \
+              -v "${vol_etc}:/etc/letsencrypt" \
               certbot/certbot:latest \
               certificates --domain "$DOMAIN" > "$certbot_log" 2>&1 || true
             echo "   [5.3] done — certbot log:"
