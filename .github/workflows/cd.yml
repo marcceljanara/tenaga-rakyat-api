@@ -48,7 +48,9 @@ jobs:
           script_stop: true
           script: |
             set -eu
-            trap 'echo "DEPLOY ERROR at line $LINENO — command: $BASH_COMMAND"' ERR
+            DEPLOY_LOG="/tmp/deploy_$$.log"
+            exec > >(tee -a "$DEPLOY_LOG") 2>&1
+            trap 'echo "--- DEPLOY FAILED ---"; echo "Last 30 lines of log:"; tail -30 "$DEPLOY_LOG" 2>/dev/null || true' ERR
 
             if [ -z "${APP_DIR:-}" ]; then
               APP_DIR="$HOME/tenaga-rakyat-api"
