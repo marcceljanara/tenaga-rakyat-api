@@ -99,16 +99,19 @@ jobs:
             docker pull certbot/certbot:latest
 
             echo "   Checking certificate in Docker volume..."
-            cert_check="$(compose run --rm --no-deps \
+            certbot_log="/tmp/certbot_check.txt"
+            compose run --rm --no-deps \
               --entrypoint certbot \
               certbot \
               certificates \
-              --domain "$DOMAIN" 2>&1 || true)"
+              --domain "$DOMAIN" > "$certbot_log" 2>&1 || true
 
-            if echo "$cert_check" | grep -qi "VALID"; then
+            if grep -qi "VALID" "$certbot_log" 2>/dev/null; then
               echo "   Valid SSL certificate already exists"
             else
-              echo "   No valid certificate found, requesting via standalone mode..."
+              echo "   Certbot check output:"
+              cat "$certbot_log" 2>/dev/null || true
+              echo "   Requesting new SSL certificate for $DOMAIN via standalone mode..."
               compose stop nginx 2>/dev/null || true
               sleep 2
               compose run --rm --no-deps \
@@ -124,6 +127,7 @@ jobs:
                 --non-interactive \
               || { echo "ERROR: certbot failed to obtain certificate for $DOMAIN"; exit 1; }
             fi
+            rm -f "$certbot_log"
 
             echo "6. Pulling base images"
             compose pull nginx certbot postgres redis || true
