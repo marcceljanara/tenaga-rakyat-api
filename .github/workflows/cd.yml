@@ -125,9 +125,11 @@ jobs:
               echo "   Freeing port 80 for standalone challenge..."
               systemctl stop nginx 2>/dev/null || true
               docker ps -q --filter publish=80 | xargs -r docker stop 2>/dev/null || true
-              sleep 2
+              sleep 3
 
-              echo "   Running certbot standalone..."
+              echo "   Running certbot standalone (output captured)..."
+              standalone_log="/tmp/certbot_standalone_$$"
+              certbot_exit=0
               docker run --rm \
                 -p 80:80 \
                 -v "${vol_etc}:/etc/letsencrypt" \
@@ -137,7 +139,17 @@ jobs:
                 -d "$DOMAIN" \
                 --email "$LETSENCRYPT_EMAIL" \
                 --agree-tos --no-eff-email --non-interactive \
-              || { systemctl start nginx 2>/dev/null || true; echo "ERROR: certbot failed"; exit 1; }
+                > "$standalone_log" 2>&1 || certbot_exit=$?
+
+              echo "   Certbot standalone output:"
+              cat "$standalone_log" || true
+              rm -f "$standalone_log"
+
+              if [ "$certbot_exit" -ne 0 ]; then
+                systemctl start nginx 2>/dev/null || true
+                echo "ERROR: certbot standalone failed with exit code $certbot_exit"
+                exit 1
+              fi
 
               systemctl start nginx 2>/dev/null || true
             fi
