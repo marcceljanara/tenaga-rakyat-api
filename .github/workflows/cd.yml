@@ -93,45 +93,44 @@ jobs:
             test -f .env
             compose config --quiet
 
-            echo "5. Checking SSL certificate"
+            echo "5. Provisioning SSL certificate"
 
             project_name="$(basename "${APP_DIR%/}")"
-            certbot_etc_vol="${project_name}_certbot-etc"
-            certbot_www_vol="${project_name}_certbot-www"
+            vol_etc="${project_name}_certbot-etc"
+            vol_www="${project_name}_certbot-www"
 
-            echo "   Ensuring certbot volumes exist (project: $project_name)..."
-            docker volume create "$certbot_etc_vol" > /dev/null || true
-            docker volume create "$certbot_www_vol" > /dev/null || true
+            docker volume create "$vol_etc" > /dev/null 2>&1 || true
+            docker volume create "$vol_www" > /dev/null 2>&1 || true
 
-            echo "   Checking certificate in Docker volume..."
-            certbot_log="/tmp/certbot_check_$$.txt"
+            certbot_log="/tmp/certbot_$$"
             docker run --rm \
-              -v "${certbot_etc_vol}:/etc/letsencrypt:ro" \
+              -v "${vol_etc}:/etc/letsencrypt:ro" \
               certbot/certbot:latest \
-              certificates \
-              --domain "$DOMAIN" > "$certbot_log" 2>&1 || true
+              certificates --domain "$DOMAIN" > "$certbot_log" 2>&1 || true
 
             if grep -qi "VALID" "$certbot_log" 2>/dev/null; then
-              echo "   Valid SSL certificate already exists"
+              echo "   Certificate OK — skipping issuance"
             else
-              echo "   Certbot check output:"
-              cat "$certbot_log" 2>/dev/null || true
-              echo "   Requesting new SSL certificate for $DOMAIN via standalone mode..."
-              compose stop nginx 2>/dev/null || true
+              echo "   Certificate not found. Certbot output:"
+              cat "$certbot_log" || true
+
+              echo "   Freeing port 80 for standalone challenge..."
+              systemctl stop nginx 2>/dev/null || true
+              docker ps -q --filter publish=80 | xargs -r docker stop 2>/dev/null || true
               sleep 2
+
               docker run --rm \
-                --publish 80:80 \
-                -v "${certbot_etc_vol}:/etc/letsencrypt" \
-                -v "${certbot_www_vol}:/var/www/certbot" \
+                -p 80:80 \
+                -v "${vol_etc}:/etc/letsencrypt" \
+                -v "${vol_www}:/var/www/certbot" \
                 certbot/certbot:latest \
-                certonly \
-                --standalone \
+                certonly --standalone \
                 -d "$DOMAIN" \
                 --email "$LETSENCRYPT_EMAIL" \
-                --agree-tos \
-                --no-eff-email \
-                --non-interactive \
-              || { echo "ERROR: certbot failed to obtain certificate for $DOMAIN"; exit 1; }
+                --agree-tos --no-eff-email --non-interactive \
+              || { systemctl start nginx 2>/dev/null || true; echo "ERROR: certbot failed — check domain DNS and port 80 accessibility"; exit 1; }
+
+              systemctl start nginx 2>/dev/null || true
             fi
             rm -f "$certbot_log"
 
