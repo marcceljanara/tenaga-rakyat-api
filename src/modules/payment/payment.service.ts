@@ -57,7 +57,7 @@ export class PaymentService {
     @Inject(WINSTON_MODULE_PROVIDER) private logger: Logger,
     private prismaService: PrismaService,
     private midtransService: MidtransService,
-  ) { }
+  ) {}
 
   // ============================================================
   // EXISTING METHODS (Wallet & Topup)
@@ -366,7 +366,7 @@ export class PaymentService {
         const updatedWallet = await tx.wallet.updateMany({
           where: {
             id: wallet.id,
-            balance: { gte: userRequest.amount }
+            balance: { gte: userRequest.amount },
           },
           data: {
             balance: {
@@ -921,7 +921,7 @@ export class PaymentService {
     if (withdrawRequest.status !== WithdrawStatus.APPROVED) {
       throw new HttpException(
         `Request tidak bisa di-send. Status saat ini: ${withdrawRequest.status}. ` +
-        `Hanya request dengan status APPROVED yang bisa di-send.`,
+          `Hanya request dengan status APPROVED yang bisa di-send.`,
         400,
       );
     }
