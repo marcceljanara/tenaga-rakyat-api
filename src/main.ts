@@ -8,6 +8,10 @@ import { doubleCsrfProtection } from './common/csrf';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
   // Security Headers
   app.use(
@@ -24,7 +28,7 @@ async function bootstrap() {
 
   // CORS Configuration
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
