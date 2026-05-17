@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { doubleCsrfProtection } from './common/csrf';
+import type { NextFunction, Request, Response } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -34,7 +35,13 @@ async function bootstrap() {
   });
 
   app.use(cookieParser());
-  app.use(doubleCsrfProtection);
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path === '/api/webhook/midtrans') {
+      return next();
+    }
+
+    return doubleCsrfProtection(req, res, next);
+  });
 
   // Swagger Configuration
   const config = new DocumentBuilder()
