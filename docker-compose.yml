@@ -42,8 +42,8 @@ services:
       network: host
     container_name: tenaga-rakyat-api
     restart: always
-    expose:
-      - "3000"
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-3000}:3000"
     env_file:
       - .env
     environment:
