@@ -4,8 +4,23 @@ export class WebResponse<T> {
   @ApiPropertyOptional()
   data?: T;
 
-  @ApiPropertyOptional()
-  errors?: string;
+  @ApiPropertyOptional({
+    oneOf: [
+      { type: 'string', example: 'Error message here' },
+      {
+        type: 'object',
+        additionalProperties: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        example: {
+          field_name: ['pesan error 1', 'pesan error 2'],
+        },
+      },
+    ],
+    description: 'Detail error. Bisa berupa string pesan error tunggal atau objek terstruktur berisi pesan error validasi per field.',
+  })
+  errors?: string | Record<string, string[]>;
 
   @ApiPropertyOptional()
   paging?: Paging;

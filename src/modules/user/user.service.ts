@@ -107,7 +107,7 @@ export class UserService {
       },
     });
     if (!user) {
-      throw new HttpException('Email is invalid', 401);
+      throw new HttpException('Email atau password salah', 401);
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -116,7 +116,7 @@ export class UserService {
     );
 
     if (!isPasswordValid) {
-      throw new HttpException('Password is invalid', 401);
+      throw new HttpException('Email atau password salah', 401);
     }
 
     const accessToken = await this.jwt.signAsync({

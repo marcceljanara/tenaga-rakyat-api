@@ -70,11 +70,23 @@ Dokumentasi lengkap untuk Job Platform API yang menyediakan layanan untuk manaje
 Sebagian besar endpoint memerlukan authentication menggunakan Bearer Token yang didapatkan setelah login. Token disimpan dalam cookie dengan nama \`access_token\`.
 
 ## Error Responses
-Semua error response mengikuti format:
+Error response memiliki dua format tergantung jenis errornya:
+
+1. **Error Validasi (Zod Schema Validation)**:
 \`\`\`json
 {
-  "errors": "Error message here",
-  "statusCode": 400
+  "errors": {
+    "field_name": [
+      "Pesan error validasi"
+    ]
+  }
+}
+\`\`\`
+
+2. **Error Umum (Business Logic / General Exceptions)**:
+\`\`\`json
+{
+  "errors": "Pesan error detail"
 }
 \`\`\`
 
