@@ -10,16 +10,24 @@ export class ReportValidation {
   ];
 
   static readonly DASHBOARD_SUMMARY = z.object({
-    granularity: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
+    granularity: z.enum(['daily', 'weekly', 'monthly', 'yearly'], {
+      error: () => 'Granularitas tidak valid (harus daily, weekly, monthly, atau yearly)',
+    }),
   });
 
   static readonly DATE_RANGE = z
     .object({
-      from: z.coerce.date(),
-      to: z.coerce.date(),
+      from: z.coerce.date({
+        error: (issue) =>
+          issue.input === undefined ? 'Tanggal mulai wajib diisi' : 'Format tanggal mulai tidak valid',
+      }),
+      to: z.coerce.date({
+        error: (issue) =>
+          issue.input === undefined ? 'Tanggal selesai wajib diisi' : 'Format tanggal selesai tidak valid',
+      }),
     })
     .refine((data) => data.from <= data.to, {
-      message: 'start date must not be after end date',
+      message: 'Tanggal mulai tidak boleh setelah tanggal selesai',
       path: ['from'],
     })
     .refine(
@@ -28,7 +36,7 @@ export class ReportValidation {
         return data.to.getTime() - data.from.getTime() <= maxRangeMs;
       },
       {
-        message: 'date range must not exceed 1 year',
+        message: 'Rentang tanggal tidak boleh melebihi 1 tahun',
         path: ['to'],
       },
     );
