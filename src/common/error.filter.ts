@@ -21,7 +21,7 @@ export class ErrorFilter implements ExceptionFilter {
       });
     } else if (exception instanceof ZodError) {
       response.status(400).json({
-        errors: exception.message, // bisa juga pakai exception.flatten() untuk detail
+        errors: exception.flatten().fieldErrors,
       });
     } else if (exception instanceof Error) {
       response.status(500).json({
