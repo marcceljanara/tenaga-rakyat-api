@@ -958,7 +958,7 @@ describe('PaymentController', () => {
       expect(response.statusCode).toBe(200);
     });
 
-    it('should return 500 if package not found (unhandled Prisma error)', async () => {
+    it('should return 404 if package not found', async () => {
       const response = await request(app.getHttpServer())
         .put('/api/admin/posting-credit/99999')
         .set('Cookie', adminCookie)
@@ -967,7 +967,7 @@ describe('PaymentController', () => {
         });
 
       logger.debug(response.body);
-      expect(response.statusCode).toBe(500);
+      expect(response.statusCode).toBe(404);
     });
 
     it('should reject if not authenticated', async () => {
@@ -1013,13 +1013,13 @@ describe('PaymentController', () => {
       expect(response.body.message).toBeDefined();
     });
 
-    it('should return 500 if package not found (unhandled Prisma error)', async () => {
+    it('should return 404 if package not found', async () => {
       const response = await request(app.getHttpServer())
         .delete('/api/admin/posting-credit/99999')
         .set('Cookie', adminCookie);
 
       logger.debug(response.body);
-      expect(response.statusCode).toBe(500);
+      expect(response.statusCode).toBe(404);
     });
 
     it('should reject if not authenticated', async () => {
