@@ -10,6 +10,7 @@ import { PrismaService } from './prisma.service';
 import { WinstonModule } from 'nest-winston';
 import winston from 'winston';
 import { ConfigModule } from '@nestjs/config';
+import { validateEnv } from './env.validation';
 import { ValidationService } from './validation.service';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ErrorFilter } from './error.filter';
@@ -32,6 +33,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
     }),
     ConfigModule.forRoot({
       isGlobal: true,
+      validate: validateEnv,
     }),
     ThrottlerModule.forRoot([
       {

@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
@@ -8,7 +8,7 @@ import { Logger } from 'winston';
 @Injectable()
 export class PrismaService
   extends PrismaClient<Prisma.PrismaClientOptions, string>
-  implements OnModuleInit
+  implements OnModuleInit, OnModuleDestroy
 {
   constructor(
     @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
@@ -50,5 +50,8 @@ export class PrismaService
     this.$on('query', (e) => {
       this.logger.info(e);
     });
+  }
+  async onModuleDestroy() {
+    await this.$disconnect();
   }
 }
