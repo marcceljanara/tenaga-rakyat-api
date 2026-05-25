@@ -10,11 +10,9 @@ import {
   Post,
   Put,
   Query,
-  Req,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { JobService } from './job.service';
-import { JwtService } from '@nestjs/jwt';
 import {
   CreateJobRequest,
   UpdateJobRequest,
@@ -24,7 +22,7 @@ import {
   UpdateEmployerJobStatusRequest,
 } from '../../model/job.model';
 import { WebResponse } from '../../model/web.model';
-import { Auth } from '../../common/auth/auth.decorator';
+import { Auth, OptionalAuth } from '../../common/auth/auth.decorator';
 import { Roles } from '../../common/role/role.decorator';
 import type { User } from '@prisma/client';
 import { ROLES } from '../../common/role/role';
@@ -47,7 +45,6 @@ import {
 export class JobController {
   constructor(
     private jobService: JobService,
-    private jwtService: JwtService,
   ) {}
 
   /**
@@ -235,12 +232,11 @@ export class JobController {
     },
   })
   @ApiResponse({ status: 404, description: 'Job not found' })
-  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   async getJobDetailPublic(
-    @Auth() user: User,
+    @OptionalAuth() user: User | undefined,
     @Param('jobId', ParseIntPipe) jobId: number,
   ): Promise<WebResponse<JobResponse>> {
-    const result = await this.jobService.getJobDetailPublic(jobId, user.id);
+    const result = await this.jobService.getJobDetailPublic(jobId, user?.id);
     return {
       data: result,
     };
@@ -323,7 +319,7 @@ export class JobController {
     },
   })
   async searchJobs(
-    @Req() req: any,
+    @OptionalAuth() user: User | undefined,
     @Query('keyword') keyword?: string,
     @Query('location') location?: string,
     @Query('min_compensation') minCompensation?: string,
@@ -334,19 +330,6 @@ export class JobController {
     @Query('sort_by') sortBy?: string,
     @Query('sort_order') sortOrder?: string,
   ): Promise<WebResponse<JobListResponse>> {
-    let userId: string | undefined = undefined;
-    const token = req.cookies?.['access_token'] as string;
-    if (token) {
-      try {
-        const payload = await this.jwtService.verifyAsync(token, {
-          secret: process.env.JWT_SECRET,
-        });
-        userId = payload.id;
-      } catch (err) {
-        // Ignore invalid tokens, treat as guest
-      }
-    }
-
     const result = await this.jobService.searchJobs({
       keyword,
       location,
@@ -361,7 +344,7 @@ export class JobController {
       limit: limit ? parseInt(limit, 10) : 10,
       sort_by: (sortBy as any) || 'posted_at',
       sort_order: (sortOrder as any) || 'desc',
-    }, userId);
+    }, user?.id);
 
     return {
       data: result,

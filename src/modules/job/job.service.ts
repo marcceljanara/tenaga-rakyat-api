@@ -614,22 +614,24 @@ export class JobService {
   }
   async getJobDetailPublic(
     jobId: number,
-    userId: string,
+    userId?: string,
   ): Promise<JobResponse> {
     this.logger.debug(`Getting job detail ${jobId}`);
 
     // Ambil user location jika ada
-    const user = await this.prismaService.user.findUnique({
-      where: {
-        id: userId,
-      },
-      select: {
-        latitude: true,
-        longitude: true,
-      },
-    });
+    const user = userId
+      ? await this.prismaService.user.findUnique({
+          where: {
+            id: userId,
+          },
+          select: {
+            latitude: true,
+            longitude: true,
+          },
+        })
+      : null;
 
-    if (!user) {
+    if (userId && !user) {
       throw new HttpException('User tidak ditemukan', 404);
     }
 
@@ -651,10 +653,14 @@ export class JobService {
             jobApplications: true,
           },
         },
-        jobApplications: {
-          where: { worker_id: userId },
-          select: { id: true },
-        },
+        ...(userId
+          ? {
+              jobApplications: {
+                where: { worker_id: userId },
+                select: { id: true },
+              },
+            }
+          : {}),
       },
     });
 
@@ -662,7 +668,7 @@ export class JobService {
       throw new HttpException('Lowongan tidak ditemukan', 404);
     }
 
-    if (!user.latitude || !user.longitude) {
+    if (!user || !user.latitude || !user.longitude) {
       return this.mapToJobResponsePublic({ ...job, distance: null });
     }
     const distance = this.locationService.distanceKm(

@@ -403,12 +403,15 @@ describe('JobController', () => {
       expect(response.statusCode).toBe(404);
     });
 
-    it('should reject if not authenticated', async () => {
+    it('should succeed if not authenticated (public)', async () => {
       const response = await request(app.getHttpServer()).get(
         `/api/jobs/${jobId}/public`,
       );
 
-      expect(response.statusCode).toBe(401);
+      logger.debug(response.body);
+      expect(response.statusCode).toBe(200);
+      expect(response.body.data).toBeDefined();
+      expect(response.body.data.id).toBe(jobId);
     });
   });
 
