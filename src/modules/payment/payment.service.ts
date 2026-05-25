@@ -1145,27 +1145,46 @@ export class PaymentService {
   }
 
   async handleCallbackCredit(body: TopupCallbackRequest) {
+    // Validasi struktur body terlebih dahulu sebelum memproses apapun
+    const validatedBody = this.validationService.validate(
+      PaymentValidation.MIDTRANS_CALLBACK,
+      body,
+    );
+
+    this.logger.info(
+      `[Webhook] Midtrans callback received. order_id=${validatedBody.order_id} status=${validatedBody.transaction_status}`,
+    );
+
+    // Catatan keamanan: JANGAN pernah log signature_key — ini adalah material
+    // kriptografik yang bisa digunakan ulang oleh penyerang.
+    // Hanya log field yang aman seperti order_id, status_code, transaction_status.
+
     const isValid = this.midtransService.verifySignature(
-      body.order_id,
-      body.status_code,
-      body.gross_amount,
-      body.signature_key,
+      validatedBody.order_id,
+      validatedBody.status_code,
+      validatedBody.gross_amount,
+      validatedBody.signature_key,
     );
 
     if (!isValid) {
+      this.logger.warn(
+        `[Webhook] Invalid signature for order_id=${validatedBody.order_id}. Request rejected.`,
+      );
       throw new UnauthorizedException('Invalid signature');
     }
 
-    const orderId = body.order_id;
+    const orderId = validatedBody.order_id;
 
-    switch (body.transaction_status) {
+    switch (validatedBody.transaction_status) {
       case 'settlement':
-        await this.completeTopupCredit(orderId, body);
+      case 'capture': // kartu kredit Midtrans menggunakan status 'capture'
+        await this.completeTopupCredit(orderId, validatedBody);
         break;
 
       case 'expire':
         await this.markExpired(orderId);
         break;
+
       case 'cancel':
         await this.markFailed(orderId);
         break;
@@ -1175,36 +1194,76 @@ export class PaymentService {
         break;
 
       case 'pending':
+        // Tidak ada aksi — transaksi masih menunggu pembayaran
         break;
 
       default:
-        console.warn('Unhandled Midtrans status:', body.transaction_status);
+        this.logger.warn(
+          `[Webhook] Unhandled Midtrans status: ${validatedBody.transaction_status} for order_id=${orderId}`,
+        );
     }
 
+    this.logger.info(
+      `[Webhook] Callback processed successfully. order_id=${orderId}`,
+    );
     return { success: true };
   }
 
   async markExpired(orderId: string) {
-    await this.prismaService.postingCreditPurchase.updateMany({
-      where: {
-        payment_reference: orderId,
-        status: PurchaseStatus.PENDING,
-      },
-      data: {
-        status: PurchaseStatus.EXPIRED,
-      },
+    this.logger.info(`[Webhook] Marking order ${orderId} as EXPIRED`);
+    await this.prismaService.$transaction(async (tx) => {
+      const purchase = await tx.postingCreditPurchase.findUnique({
+        where: { payment_reference: orderId },
+      });
+
+      if (!purchase || purchase.status !== PurchaseStatus.PENDING) return;
+
+      await tx.postingCreditPurchase.updateMany({
+        where: {
+          payment_reference: orderId,
+          status: PurchaseStatus.PENDING,
+        },
+        data: { status: PurchaseStatus.EXPIRED },
+      });
+
+      if (purchase.transaction_id) {
+        await tx.transaction.updateMany({
+          where: {
+            id: purchase.transaction_id,
+            status: TransactonStatus.PENDING,
+          },
+          data: { status: TransactonStatus.FAILED },
+        });
+      }
     });
   }
 
   async markFailed(orderId: string) {
-    await this.prismaService.postingCreditPurchase.updateMany({
-      where: {
-        payment_reference: orderId,
-        status: PurchaseStatus.PENDING,
-      },
-      data: {
-        status: PurchaseStatus.FAILED,
-      },
+    this.logger.info(`[Webhook] Marking order ${orderId} as FAILED`);
+    await this.prismaService.$transaction(async (tx) => {
+      const purchase = await tx.postingCreditPurchase.findUnique({
+        where: { payment_reference: orderId },
+      });
+
+      if (!purchase || purchase.status !== PurchaseStatus.PENDING) return;
+
+      await tx.postingCreditPurchase.updateMany({
+        where: {
+          payment_reference: orderId,
+          status: PurchaseStatus.PENDING,
+        },
+        data: { status: PurchaseStatus.FAILED },
+      });
+
+      if (purchase.transaction_id) {
+        await tx.transaction.updateMany({
+          where: {
+            id: purchase.transaction_id,
+            status: TransactonStatus.PENDING,
+          },
+          data: { status: TransactonStatus.FAILED },
+        });
+      }
     });
   }
 
@@ -1280,7 +1339,7 @@ export class PaymentService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
-    console.log('Topup success:', orderId);
+    this.logger.info(`[Webhook] Topup credit success for order_id=${orderId}`);
   }
 
   async getPostingCreditPurchaseByUserId(

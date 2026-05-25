@@ -146,32 +146,6 @@ export class PaymentController {
     };
   }
 
-  // Not Implement
-  // @Post('/webhook/midtrans')
-  // @HttpCode(200)
-  // @ApiTags('Payment & Wallet', 'Posting Credits')
-  // @ApiOperation({
-  //   summary: 'Midtrans webhook (Wallet & Credit)',
-  //   description: 'Handle Midtrans payment callback for wallet top-up and posting credit purchase (Midtrans only)',
-  // })
-  // @ApiBody({ type: TopupCallbackRequest })
-  // @ApiResponse({
-  //   status: 200,
-  //   description: 'Callback processed',
-  //   schema: {
-  //     type: 'object',
-  //     properties: {
-  //       message: { type: 'string', example: 'OK' },
-  //     },
-  //   },
-  // })
-  // @ApiResponse({ status: 401, description: 'Invalid signature' })
-  // async midtransCallback(@Body() body: TopupCallbackRequest) {
-  //   console.log('Midtrans callback received:', body);
-  //     await this.paymentService.handleCallback(body);
-  //   return { message: 'OK' };
-  // }
-
   @Get('/wallets')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
@@ -1064,10 +1038,13 @@ export class PaymentController {
 
   @Post('/webhook/midtrans')
   @HttpCode(200)
+  @Throttle({ default: { limit: 100, ttl: 60000 } }) // Override: Midtrans server bisa retry berkali-kali
   @ApiTags('Posting Credits')
   @ApiOperation({
     summary: 'Midtrans credit webhook',
-    description: 'Handle Midtrans credit payment callback (Midtrans only)',
+    description:
+      'Handle Midtrans credit payment callback (Midtrans server-to-server only). ' +
+      'Verifies signature_key before processing. Idempotent — safe to receive duplicate calls.',
   })
   @ApiBody({ type: TopupCallbackRequest })
   @ApiResponse({
@@ -1080,8 +1057,8 @@ export class PaymentController {
       },
     },
   })
+  @ApiResponse({ status: 401, description: 'Invalid signature — request rejected' })
   async midtransCreditCallback(@Body() body: TopupCallbackRequest) {
-    console.log('Midtrans callback received:', body);
     await this.paymentService.handleCallbackCredit(body);
     return { message: 'OK' };
   }

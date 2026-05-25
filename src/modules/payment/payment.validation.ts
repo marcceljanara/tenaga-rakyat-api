@@ -217,4 +217,32 @@ export class PaymentValidation {
       .min(1, 'ID paket kredit minimal 1')
       .positive('ID paket kredit tidak valid'),
   });
+
+  /**
+   * Validasi body webhook dari Midtrans.
+   * Semua field ini wajib ada — jika salah satu kosong,
+   * request akan ditolak sebelum verifikasi signature.
+   * Ref: https://docs.midtrans.com/docs/https-notification-webhooks
+   */
+  static readonly MIDTRANS_CALLBACK = z.object({
+    order_id: z.string({
+      error: () => 'order_id wajib diisi dan harus berupa teks',
+    }).min(1, 'order_id tidak boleh kosong'),
+
+    status_code: z.string({
+      error: () => 'status_code wajib diisi dan harus berupa teks',
+    }).min(1, 'status_code tidak boleh kosong'),
+
+    gross_amount: z.string({
+      error: () => 'gross_amount wajib diisi dan harus berupa teks',
+    }).min(1, 'gross_amount tidak boleh kosong'),
+
+    signature_key: z.string({
+      error: () => 'signature_key wajib diisi dan harus berupa teks',
+    }).min(1, 'signature_key tidak boleh kosong'),
+
+    transaction_status: z.string({
+      error: () => 'transaction_status wajib diisi dan harus berupa teks',
+    }).min(1, 'transaction_status tidak boleh kosong'),
+  });
 }
