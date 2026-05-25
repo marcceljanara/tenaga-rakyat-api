@@ -22,7 +22,7 @@ import {
   UpdateEmployerJobStatusRequest,
 } from '../../model/job.model';
 import { WebResponse } from '../../model/web.model';
-import { Auth } from '../../common/auth/auth.decorator';
+import { Auth, OptionalAuth } from '../../common/auth/auth.decorator';
 import { Roles } from '../../common/role/role.decorator';
 import type { User } from '@prisma/client';
 import { ROLES } from '../../common/role/role';
@@ -34,14 +34,18 @@ import {
   ApiBody,
   ApiParam,
   ApiQuery,
+  ApiExtraModels,
 } from '@nestjs/swagger';
 
 @ApiTags('Job Management')
 @ApiBearerAuth()
+@ApiExtraModels(JobResponse, JobListResponse)
 @Throttle({ default: { limit: 30, ttl: 60000 } })
 @Controller('/api/jobs')
 export class JobController {
-  constructor(private jobService: JobService) {}
+  constructor(
+    private jobService: JobService,
+  ) {}
 
   /**
    * POST /api/jobs
@@ -175,7 +179,8 @@ export class JobController {
   @HttpCode(200)
   @ApiOperation({
     summary: 'Get job detail Private',
-    description: 'Get detailed job information (Private for Worker/Provider).',
+    description:
+      'Get detailed job information (Private for Worker/Provider). If a worker is logged in, the response includes an `is_applied` boolean flag indicating whether the worker has already applied for the job.',
   })
   @ApiParam({ name: 'jobId', type: Number, description: 'Job ID' })
   @ApiResponse({
@@ -212,7 +217,8 @@ export class JobController {
   @HttpCode(200)
   @ApiOperation({
     summary: 'Get job detail Public',
-    description: 'Get detailed job information (Public)',
+    description:
+      'Get detailed job information (Public). If a worker is logged in, the response includes an `is_applied` boolean flag indicating whether the worker has already applied for the job.',
   })
   @ApiParam({ name: 'jobId', type: Number, description: 'Job ID' })
   @ApiResponse({
@@ -226,12 +232,11 @@ export class JobController {
     },
   })
   @ApiResponse({ status: 404, description: 'Job not found' })
-  @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])
   async getJobDetailPublic(
-    @Auth() user: User,
+    @OptionalAuth() user: User | undefined,
     @Param('jobId', ParseIntPipe) jobId: number,
   ): Promise<WebResponse<JobResponse>> {
-    const result = await this.jobService.getJobDetailPublic(jobId, user.id);
+    const result = await this.jobService.getJobDetailPublic(jobId, user?.id);
     return {
       data: result,
     };
@@ -247,7 +252,7 @@ export class JobController {
   @ApiOperation({
     summary: 'Search jobs',
     description:
-      'Search and filter job listings (Public). Default shows OPEN jobs only.',
+      'Search and filter job listings (Public). Default shows OPEN jobs only. If a worker is logged in, the response includes an `is_applied` boolean flag indicating whether the worker has already applied for the job.',
   })
   @ApiQuery({
     name: 'keyword',
@@ -314,6 +319,7 @@ export class JobController {
     },
   })
   async searchJobs(
+    @OptionalAuth() user: User | undefined,
     @Query('keyword') keyword?: string,
     @Query('location') location?: string,
     @Query('min_compensation') minCompensation?: string,
@@ -338,7 +344,7 @@ export class JobController {
       limit: limit ? parseInt(limit, 10) : 10,
       sort_by: (sortBy as any) || 'posted_at',
       sort_order: (sortOrder as any) || 'desc',
-    });
+    }, user?.id);
 
     return {
       data: result,

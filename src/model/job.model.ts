@@ -141,6 +141,9 @@ export class JobResponse {
   _count?: {
     jobApplications: number;
   };
+
+  @ApiPropertyOptional()
+  is_applied?: boolean;
 }
 
 export class JobListResponse {

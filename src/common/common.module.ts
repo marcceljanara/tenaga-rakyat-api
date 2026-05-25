@@ -13,7 +13,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ValidationService } from './validation.service';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ErrorFilter } from './error.filter';
-import { AuthMiddleware } from './auth/auth.middleware';
+import { AuthMiddleware, OptionalAuthMiddleware } from './auth/auth.middleware';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { ScheduleModule } from '@nestjs/schedule';
 import { RoleGuard } from './role/role.guard';
@@ -87,17 +87,23 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
         ]
       : []),
   ],
-  exports: [PrismaService, ValidationService],
+  exports: [PrismaService, ValidationService, JwtModule],
 })
 // implementasi authentikasi JWT
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(AuthMiddleware)
-      .exclude({
-        path: '/api/jobs',
-        method: RequestMethod.GET,
-      })
+      .exclude(
+        {
+          path: '/api/jobs',
+          method: RequestMethod.GET,
+        },
+        {
+          path: '/api/jobs/:jobId/public',
+          method: RequestMethod.GET,
+        },
+      )
       .forRoutes(
         '/api/users/profile',
         '/api/users/profile/*path',
@@ -125,6 +131,19 @@ export class CommonModule implements NestModule {
         '/api/credits/*path',
         '/api/reviews',
         '/api/reviews/*path',
+      );
+
+    consumer
+      .apply(OptionalAuthMiddleware)
+      .forRoutes(
+        {
+          path: '/api/jobs',
+          method: RequestMethod.GET,
+        },
+        {
+          path: '/api/jobs/:jobId/public',
+          method: RequestMethod.GET,
+        },
       );
   }
 }
