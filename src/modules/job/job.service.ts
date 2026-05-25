@@ -558,6 +558,10 @@ export class JobService {
             jobApplications: true,
           },
         },
+        jobApplications: {
+          where: { worker_id: userId },
+          select: { id: true },
+        },
       },
     });
 
@@ -647,6 +651,10 @@ export class JobService {
             jobApplications: true,
           },
         },
+        jobApplications: {
+          where: { worker_id: userId },
+          select: { id: true },
+        },
       },
     });
 
@@ -667,7 +675,10 @@ export class JobService {
     return this.mapToJobResponsePublic({ ...job, distance });
   }
 
-  async searchJobs(query: JobSearchQuery): Promise<JobListResponse> {
+  async searchJobs(
+    query: JobSearchQuery,
+    userId?: string,
+  ): Promise<JobListResponse> {
     this.logger.debug(`Searching jobs with query ${JSON.stringify(query)}`);
 
     const page = query.page || 1;
@@ -743,6 +754,14 @@ export class JobService {
               jobApplications: true,
             },
           },
+          ...(userId
+            ? {
+                jobApplications: {
+                  where: { worker_id: userId },
+                  select: { id: true },
+                },
+              }
+            : {}),
         },
       }),
       this.prismaService.job.count({ where }),
@@ -952,6 +971,7 @@ export class JobService {
             email: job.worker.email,
           }
         : undefined,
+      is_applied: job.jobApplications ? job.jobApplications.length > 0 : undefined,
     };
   }
   private mapToJobResponsePublic(job: any): JobResponse {
@@ -983,6 +1003,7 @@ export class JobService {
             jobApplications: job._count.jobApplications,
           }
         : undefined,
+      is_applied: job.jobApplications ? job.jobApplications.length > 0 : undefined,
     };
   }
 }

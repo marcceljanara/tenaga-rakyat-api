@@ -10,9 +10,11 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { JobService } from './job.service';
+import { JwtService } from '@nestjs/jwt';
 import {
   CreateJobRequest,
   UpdateJobRequest,
@@ -34,14 +36,19 @@ import {
   ApiBody,
   ApiParam,
   ApiQuery,
+  ApiExtraModels,
 } from '@nestjs/swagger';
 
 @ApiTags('Job Management')
 @ApiBearerAuth()
+@ApiExtraModels(JobResponse, JobListResponse)
 @Throttle({ default: { limit: 30, ttl: 60000 } })
 @Controller('/api/jobs')
 export class JobController {
-  constructor(private jobService: JobService) {}
+  constructor(
+    private jobService: JobService,
+    private jwtService: JwtService,
+  ) {}
 
   /**
    * POST /api/jobs
@@ -175,7 +182,8 @@ export class JobController {
   @HttpCode(200)
   @ApiOperation({
     summary: 'Get job detail Private',
-    description: 'Get detailed job information (Private for Worker/Provider).',
+    description:
+      'Get detailed job information (Private for Worker/Provider). If a worker is logged in, the response includes an `is_applied` boolean flag indicating whether the worker has already applied for the job.',
   })
   @ApiParam({ name: 'jobId', type: Number, description: 'Job ID' })
   @ApiResponse({
@@ -212,7 +220,8 @@ export class JobController {
   @HttpCode(200)
   @ApiOperation({
     summary: 'Get job detail Public',
-    description: 'Get detailed job information (Public)',
+    description:
+      'Get detailed job information (Public). If a worker is logged in, the response includes an `is_applied` boolean flag indicating whether the worker has already applied for the job.',
   })
   @ApiParam({ name: 'jobId', type: Number, description: 'Job ID' })
   @ApiResponse({
@@ -247,7 +256,7 @@ export class JobController {
   @ApiOperation({
     summary: 'Search jobs',
     description:
-      'Search and filter job listings (Public). Default shows OPEN jobs only.',
+      'Search and filter job listings (Public). Default shows OPEN jobs only. If a worker is logged in, the response includes an `is_applied` boolean flag indicating whether the worker has already applied for the job.',
   })
   @ApiQuery({
     name: 'keyword',
@@ -314,6 +323,7 @@ export class JobController {
     },
   })
   async searchJobs(
+    @Req() req: any,
     @Query('keyword') keyword?: string,
     @Query('location') location?: string,
     @Query('min_compensation') minCompensation?: string,
@@ -324,6 +334,19 @@ export class JobController {
     @Query('sort_by') sortBy?: string,
     @Query('sort_order') sortOrder?: string,
   ): Promise<WebResponse<JobListResponse>> {
+    let userId: string | undefined = undefined;
+    const token = req.cookies?.['access_token'] as string;
+    if (token) {
+      try {
+        const payload = await this.jwtService.verifyAsync(token, {
+          secret: process.env.JWT_SECRET,
+        });
+        userId = payload.id;
+      } catch (err) {
+        // Ignore invalid tokens, treat as guest
+      }
+    }
+
     const result = await this.jobService.searchJobs({
       keyword,
       location,
@@ -338,7 +361,7 @@ export class JobController {
       limit: limit ? parseInt(limit, 10) : 10,
       sort_by: (sortBy as any) || 'posted_at',
       sort_order: (sortOrder as any) || 'desc',
-    });
+    }, userId);
 
     return {
       data: result,

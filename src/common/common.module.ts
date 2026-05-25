@@ -87,7 +87,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
         ]
       : []),
   ],
-  exports: [PrismaService, ValidationService],
+  exports: [PrismaService, ValidationService, JwtModule],
 })
 // implementasi authentikasi JWT
 export class CommonModule implements NestModule {
