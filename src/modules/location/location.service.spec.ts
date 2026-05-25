@@ -73,5 +73,10 @@ describe('LocationService', () => {
       const expectedDistance = Math.PI * 6371;
       expect(Math.abs(distance - expectedDistance)).toBeLessThan(1);
     });
+
+    it('should throw BadRequestException when coordinates are invalid', () => {
+      expect(() => service.distanceKm(91, 0, -90, 0)).toThrow();
+      expect(() => service.distanceKm(90, 0, -90, 181)).toThrow();
+    });
   });
 });

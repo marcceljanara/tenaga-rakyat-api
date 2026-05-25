@@ -5,11 +5,15 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { doubleCsrfProtection } from './common/csrf';
 import type { NextFunction, Request, Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
-  const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  const configService = app.get(ConfigService);
+  const allowedOrigins = (
+    configService.get<string>('FRONTEND_URL') || 'http://localhost:5173'
+  )
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
@@ -187,7 +191,7 @@ Success response mengikuti format:
       },
     },
   });
-  const port = process.env.PORT || 3000;
+  const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);
   console.log(`🚀 Application is running on: http://localhost:${port}`);
   console.log(`📚 Swagger documentation: http://localhost:${port}/api/docs`);
