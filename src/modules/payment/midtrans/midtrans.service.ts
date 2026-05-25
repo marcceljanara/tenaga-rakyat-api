@@ -1,14 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import midtransClient from 'midtrans-client';
 import { midtransConfig } from './midtrans.config';
 import crypto from 'crypto';
 import { MidtransSnapParams } from '../../../model/payment.model';
+import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
+import { Logger } from 'winston';
 
 @Injectable()
 export class MidtransService {
   private snap: midtransClient.Snap;
 
-  constructor() {
+  constructor(
+    @Inject(WINSTON_MODULE_PROVIDER) private logger: Logger,
+  ) {
     this.snap = new midtransClient.Snap({
       isProduction: midtransConfig.isProduction,
       serverKey: midtransConfig.serverKey,
@@ -52,13 +56,21 @@ export class MidtransService {
         redirectUrl: transaction.redirect_url,
       };
     } catch (err) {
-      console.error('Midtrans error:', err);
+      this.logger.error('[Midtrans] createTransaction failed', {
+        orderId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       throw new Error('Failed to create Midtrans transaction');
     }
   }
 
   /**
-   * (Opsional) verifikasi signature pada callback Midtrans
+   * [WAJIB] Verifikasi signature dari Midtrans webhook notification.
+   * Signature = SHA512(order_id + status_code + gross_amount + server_key)
+   * Ref: https://docs.midtrans.com/docs/https-notification-webhooks
+   *
+   * JANGAN lewati verifikasi ini — tanpa ini siapa pun bisa mengirim
+   * fake webhook dan menambah kredit secara ilegal.
    */
   verifySignature(
     orderId: string,

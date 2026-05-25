@@ -146,7 +146,6 @@ export class PaymentController {
     };
   }
 
-
   @Get('/wallets')
   @HttpCode(200)
   @Roles([ROLES.PEKERJA, ROLES.PEMBERI_KERJA, ROLES.ADMIN, ROLES.SUPER_ADMIN])

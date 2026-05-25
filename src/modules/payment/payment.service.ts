@@ -1145,30 +1145,40 @@ export class PaymentService {
   }
 
   async handleCallbackCredit(body: TopupCallbackRequest) {
-    this.logger.info(
-      `[Webhook] Midtrans callback received. order_id=${body.order_id} status=${body.transaction_status}`,
+    // Validasi struktur body terlebih dahulu sebelum memproses apapun
+    const validatedBody = this.validationService.validate(
+      PaymentValidation.MIDTRANS_CALLBACK,
+      body,
     );
 
+    this.logger.info(
+      `[Webhook] Midtrans callback received. order_id=${validatedBody.order_id} status=${validatedBody.transaction_status}`,
+    );
+
+    // Catatan keamanan: JANGAN pernah log signature_key — ini adalah material
+    // kriptografik yang bisa digunakan ulang oleh penyerang.
+    // Hanya log field yang aman seperti order_id, status_code, transaction_status.
+
     const isValid = this.midtransService.verifySignature(
-      body.order_id,
-      body.status_code,
-      body.gross_amount,
-      body.signature_key,
+      validatedBody.order_id,
+      validatedBody.status_code,
+      validatedBody.gross_amount,
+      validatedBody.signature_key,
     );
 
     if (!isValid) {
       this.logger.warn(
-        `[Webhook] Invalid signature for order_id=${body.order_id}. Request rejected.`,
+        `[Webhook] Invalid signature for order_id=${validatedBody.order_id}. Request rejected.`,
       );
       throw new UnauthorizedException('Invalid signature');
     }
 
-    const orderId = body.order_id;
+    const orderId = validatedBody.order_id;
 
-    switch (body.transaction_status) {
+    switch (validatedBody.transaction_status) {
       case 'settlement':
       case 'capture': // kartu kredit Midtrans menggunakan status 'capture'
-        await this.completeTopupCredit(orderId, body);
+        await this.completeTopupCredit(orderId, validatedBody);
         break;
 
       case 'expire':
@@ -1189,7 +1199,7 @@ export class PaymentService {
 
       default:
         this.logger.warn(
-          `[Webhook] Unhandled Midtrans status: ${body.transaction_status} for order_id=${orderId}`,
+          `[Webhook] Unhandled Midtrans status: ${validatedBody.transaction_status} for order_id=${orderId}`,
         );
     }
 
